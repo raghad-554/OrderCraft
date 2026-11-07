@@ -1,0 +1,287 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import AdminPageHeader from "@/components/admin/AdminPageHeader";
+import { ApiError } from "@/lib/api";
+import {
+  type AuditLog,
+  AUDIT_ACTIONS,
+  actionLabel,
+  actionTone,
+  formatAuditWhen,
+  listAuditLogs,
+} from "@/lib/audit";
+import { listEmployees, roleLabel, type Employee } from "@/lib/employees";
+
+export default function AuditLogBoard() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const employeeFromUrl = searchParams.get("employeeId")?.trim() || "All";
+
+  const [rows, setRows] = useState<AuditLog[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [employeeId, setEmployeeId] = useState(employeeFromUrl);
+  const [action, setAction] = useState("All");
+  const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setEmployeeId(employeeFromUrl);
+  }, [employeeFromUrl]);
+
+  function selectEmployee(nextId: string) {
+    setEmployeeId(nextId);
+    const params = new URLSearchParams(searchParams.toString());
+    if (nextId === "All") params.delete("employeeId");
+    else params.set("employeeId", nextId);
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }
+
+  const loadEmployees = useCallback(async () => {
+    try {
+      setEmployees(await listEmployees());
+    } catch {
+      setEmployees([]);
+    }
+  }, []);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await listAuditLogs({
+        employeeId: employeeId === "All" ? undefined : employeeId,
+        action: action === "All" ? undefined : action,
+      });
+      setRows(data);
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Failed to load audit log.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [action, employeeId]);
+
+  useEffect(() => {
+    void loadEmployees();
+  }, [loadEmployees]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const selectedEmployee = useMemo(
+    () => employees.find((e) => e.id === employeeId) ?? null,
+    [employeeId, employees],
+  );
+
+  const filtered = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return rows;
+    return rows.filter((row) => {
+      const haystack = [
+        row.actorName,
+        row.action,
+        row.entityType,
+        row.entityLabel,
+        row.summary,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(term);
+    });
+  }, [rows, search]);
+
+  const totals = useMemo(() => {
+    const logins = filtered.filter((r) => r.action === "Login").length;
+    const accountChanges = filtered.filter((r) =>
+      ["Created", "Updated", "Deleted", "Activated", "Deactivated", "PasswordReset", "PasswordChanged", "PermissionsUpdated"].includes(
+        r.action,
+      ),
+    ).length;
+    const workActions = filtered.length - logins - accountChanges;
+    return {
+      total: filtered.length,
+      logins,
+      accountChanges,
+      workActions: Math.max(0, workActions),
+    };
+  }, [filtered]);
+
+  return (
+    <div className="animate-rise">
+      <AdminPageHeader
+        title="Audit Log"
+        description="Monitor what each employee does in the system. Pick an employee to review their activity."
+        action={
+          <button
+            type="button"
+            onClick={() => void load()}
+            className="rounded-full border border-black/[0.08] bg-white px-4 py-2.5 text-sm font-bold text-[#051A2D] hover:bg-[#F8FAFB]"
+          >
+            Refresh
+          </button>
+        }
+      />
+
+      <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Events" value={String(totals.total)} />
+        <StatCard label="Logins" value={String(totals.logins)} />
+        <StatCard label="Account changes" value={String(totals.accountChanges)} />
+        <StatCard label="Work actions" value={String(totals.workActions)} />
+      </div>
+
+      {selectedEmployee ? (
+        <div className="mb-4 rounded-[22px] border border-black/[0.04] bg-white px-5 py-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[#8B95A5]">
+            Tracking
+          </p>
+          <p className="mt-1 text-lg font-bold text-[#0B1220]">
+            {selectedEmployee.fullName}
+          </p>
+          <p className="mt-0.5 text-sm font-medium text-[#8B95A5]">
+            {selectedEmployee.username} · {roleLabel(selectedEmployee.role)}
+            {selectedEmployee.department ? ` · ${selectedEmployee.department}` : ""}
+            {selectedEmployee.isActive ? "" : " · Inactive"}
+          </p>
+        </div>
+      ) : null}
+
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <label className="min-w-[220px] flex-1">
+          <span className="sr-only">Employee</span>
+          <select
+            value={employeeId}
+            onChange={(e) => selectEmployee(e.target.value)}
+            className="w-full rounded-2xl border border-black/[0.06] bg-white px-4 py-2.5 text-sm font-bold text-[#051A2D] outline-none focus:ring-2 focus:ring-[#051A2D]/30"
+          >
+            <option value="All">All employees</option>
+            {employees.map((employee) => (
+              <option key={employee.id} value={employee.id}>
+                {employee.fullName} ({employee.username})
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="shrink-0">
+          <span className="sr-only">Action</span>
+          <select
+            value={action}
+            onChange={(e) => setAction(e.target.value)}
+            className="rounded-2xl border border-black/[0.06] bg-white px-4 py-2.5 text-sm font-bold text-[#051A2D] outline-none focus:ring-2 focus:ring-[#051A2D]/30"
+          >
+            <option value="All">All actions</option>
+            {AUDIT_ACTIONS.map((item) => (
+              <option key={item} value={item}>
+                {actionLabel(item)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="relative min-w-[200px] flex-1">
+          <span className="sr-only">Search</span>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search summary or related item…"
+            className="w-full rounded-2xl border border-black/[0.06] bg-white px-4 py-2.5 text-sm font-medium text-[#0B1220] outline-none ring-[#051A2D]/30 placeholder:text-[#8B95A5] focus:ring-2"
+          />
+        </label>
+        <p className="text-sm font-medium text-[#8B95A5]">
+          {loading ? "Loading…" : `${filtered.length} events · view only`}
+        </p>
+      </div>
+
+      {error ? (
+        <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+          {error}
+        </div>
+      ) : null}
+
+      <div className="overflow-hidden rounded-[24px] border border-black/[0.04] bg-white">
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-left text-sm">
+            <thead className="bg-[#F8FAFB] text-xs font-semibold tracking-wide text-[#8B95A5]">
+              <tr>
+                <th className="px-5 py-3.5">When</th>
+                <th className="px-5 py-3.5">Employee</th>
+                <th className="px-5 py-3.5">Action</th>
+                <th className="px-5 py-3.5">Related to</th>
+                <th className="px-5 py-3.5">Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={5} className="px-5 py-12 text-center text-[#8B95A5]">
+                    Loading audit log…
+                  </td>
+                </tr>
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-5 py-12 text-center text-[#8B95A5]">
+                    {employeeId === "All"
+                      ? "No activity yet. Sign in, edit an employee, or change permissions to start tracking."
+                      : "No activity for this employee yet."}
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((row) => {
+                  const aboutEmployee =
+                    row.entityType === "Employee" || row.entityType === "User";
+                  const related = aboutEmployee
+                    ? row.entityLabel || "Employee account"
+                    : `${row.entityType}${row.entityLabel ? `: ${row.entityLabel}` : ""}`;
+
+                  return (
+                    <tr
+                      key={row.id}
+                      className="border-t border-black/[0.04] transition hover:bg-[#F8FAFB]"
+                    >
+                      <td className="whitespace-nowrap px-5 py-3.5 text-[#4B5563]">
+                        {formatAuditWhen(row.createdAt)}
+                      </td>
+                      <td className="px-5 py-3.5 font-semibold text-[#0B1220]">
+                        {row.actorName}
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <span
+                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${actionTone(row.action)}`}
+                        >
+                          {actionLabel(row.action)}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5 text-[#4B5563]">{related}</td>
+                      <td className="max-w-md px-5 py-3.5 text-[#4B5563]">
+                        {row.summary || "—"}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[22px] border border-black/[0.04] bg-white px-5 py-4">
+      <p className="text-xs font-semibold uppercase tracking-wide text-[#8B95A5]">{label}</p>
+      <p className="mt-1 text-xl font-bold text-[#0B1220]">{value}</p>
+    </div>
+  );
+}

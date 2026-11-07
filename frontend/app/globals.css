@@ -1,0 +1,105 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --brand: #051a2d;
+  --brand-mid: #0a3050;
+  --brand-light: #134066;
+  --brand-deep: #030f1a;
+  --accent: #2dd4a8;
+  --ink: #0b1220;
+  --muted: #8b95a5;
+  --field: #f3f5f7;
+  --surface: #ffffff;
+  --admin-sheet: #f4f6f8;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  color: var(--ink);
+  background: var(--surface);
+  font-family: var(--font-jakarta), "Segoe UI", sans-serif;
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-rise {
+  animation: rise-in 0.55s ease-out both;
+}
+
+.admin-main-sheet {
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.18);
+}
+
+.login-brand-orb {
+  display: none;
+}
+
+@keyframes orb-in {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-50%) scale(1);
+  }
+}
+
+@media (min-width: 1024px) {
+  .login-brand-orb {
+    display: block;
+    position: absolute;
+    left: -55%;
+    top: 50%;
+    z-index: 0;
+    width: 130vw;
+    height: 130vw;
+    max-width: 1600px;
+    max-height: 1600px;
+    transform: translateY(-50%);
+    border-radius: 50%;
+    background: radial-gradient(
+      circle at 38% 42%,
+      #1a4a6e 0%,
+      #051a2d 50%,
+      #030f1a 100%
+    );
+    box-shadow: 24px 0 70px rgba(5, 26, 45, 0.3);
+    pointer-events: none;
+    animation: orb-in 0.75s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}
+
+@media (min-width: 1280px) {
+  .login-brand-orb {
+    left: -48%;
+    width: 120vw;
+    height: 120vw;
+    max-width: 1700px;
+    max-height: 1700px;
+  }
+}
+
+@media (min-width: 1536px) {
+  .login-brand-orb {
+    left: -42%;
+    width: min(115vw, 1800px);
+    height: min(115vw, 1800px);
+  }
+}
