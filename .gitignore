@@ -37,6 +37,8 @@ yarn-error.log*
 .env
 .env*.local
 *.pem
+**/appsettings.Local.json
+**/appsettings.*.Local.json
 
 # IDE / OS
 .vs/

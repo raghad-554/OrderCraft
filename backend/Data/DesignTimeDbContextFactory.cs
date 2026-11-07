@@ -13,6 +13,7 @@ public class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<Applicatio
             .SetBasePath(Directory.GetCurrentDirectory())
             .AddJsonFile("appsettings.json", optional: true)
             .AddJsonFile($"appsettings.{environment}.json", optional: true)
+            .AddJsonFile("appsettings.Local.json", optional: true)
             .AddEnvironmentVariables()
             .Build();
 

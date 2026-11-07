@@ -1,0 +1,8 @@
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Host=localhost;Port=5432;Database=OrderCraft;Username=postgres;Password=YOUR_LOCAL_PASSWORD"
+  },
+  "Jwt": {
+    "Key": "YOUR_LOCAL_JWT_SECRET_AT_LEAST_32_CHARACTERS_LONG"
+  }
+}

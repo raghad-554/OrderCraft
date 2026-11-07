@@ -9,6 +9,11 @@ using Swashbuckle.AspNetCore.SwaggerUI;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Configuration.AddJsonFile(
+    "appsettings.Local.json",
+    optional: true,
+    reloadOnChange: true);
+
 // Controllers — enums as string names in JSON + Swagger (not numbers)
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
