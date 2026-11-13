@@ -30,6 +30,9 @@ public class ApplicationDbContext : DbContext
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<UserPagePermission> UserPagePermissions => Set<UserPagePermission>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<RevokedToken> RevokedTokens => Set<RevokedToken>();
+    public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
+    public DbSet<OrganizationInvitation> OrganizationInvitations => Set<OrganizationInvitation>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -38,6 +41,7 @@ public class ApplicationDbContext : DbContext
         ConfigureUser(modelBuilder);
         ConfigureOrganization(modelBuilder);
         ConfigureOrganizationMembership(modelBuilder);
+        ConfigureOrganizationInvitation(modelBuilder);
         ConfigureOrganizationRole(modelBuilder);
         ConfigureOrganizationDepartment(modelBuilder);
         ConfigureOrganizationDepartmentPermission(modelBuilder);
@@ -51,6 +55,8 @@ public class ApplicationDbContext : DbContext
         ConfigureInvoice(modelBuilder);
         ConfigurePayment(modelBuilder);
         ConfigureAuditLog(modelBuilder);
+        ConfigureRevokedToken(modelBuilder);
+        ConfigureIdempotencyRecord(modelBuilder);
     }
 
     // Evaluated per query so tenant middleware can set the org after construction.
@@ -104,6 +110,34 @@ public class ApplicationDbContext : DbContext
                 .WithMany(d => d.Memberships)
                 .HasForeignKey(m => m.OrganizationDepartmentId)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+    }
+
+    private void ConfigureOrganizationInvitation(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<OrganizationInvitation>(entity =>
+        {
+            entity.ToTable("OrganizationInvitations");
+            entity.HasKey(i => i.Id);
+            entity.Property(i => i.Email).IsRequired().HasMaxLength(256);
+            entity.Property(i => i.Status).IsRequired().HasConversion<string>().HasMaxLength(20);
+            entity.Property(i => i.TokenHash).IsRequired().HasMaxLength(128);
+            entity.Property(i => i.ExpiresAt).IsRequired();
+            entity.Property(i => i.CreatedAt).IsRequired().HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.HasIndex(i => i.TokenHash);
+            entity.HasIndex(i => new { i.OrganizationId, i.Email, i.Status });
+            entity.HasIndex(i => new { i.OrganizationId, i.Email })
+                .IsUnique()
+                .HasFilter("\"Status\" = 'Pending'");
+            entity.HasOne(i => i.Organization)
+                .WithMany()
+                .HasForeignKey(i => i.OrganizationId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(i => i.OrganizationDepartment)
+                .WithMany()
+                .HasForeignKey(i => i.OrganizationDepartmentId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasQueryFilter(i => i.OrganizationId == TenantId);
         });
     }
 
@@ -706,6 +740,9 @@ public class ApplicationDbContext : DbContext
             entity.Property(a => a.Summary)
                 .HasMaxLength(1000);
 
+            entity.Property(a => a.RequestId)
+                .HasMaxLength(64);
+
             entity.Property(a => a.CreatedAt)
                 .IsRequired()
                 .HasDefaultValueSql("CURRENT_TIMESTAMP");
@@ -713,6 +750,7 @@ public class ApplicationDbContext : DbContext
             entity.HasIndex(a => a.CreatedAt);
             entity.HasIndex(a => a.EntityType);
             entity.HasIndex(a => a.Action);
+            entity.HasIndex(a => a.RequestId);
 
             entity.HasOne(a => a.Organization)
                 .WithMany()
@@ -720,6 +758,61 @@ public class ApplicationDbContext : DbContext
                 .OnDelete(DeleteBehavior.SetNull);
 
             entity.HasQueryFilter(a => a.OrganizationId == TenantId);
+        });
+    }
+
+    private void ConfigureIdempotencyRecord(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<IdempotencyRecord>(entity =>
+        {
+            entity.ToTable("IdempotencyRecords");
+            entity.HasKey(r => r.Id);
+
+            entity.Property(r => r.Key)
+                .IsRequired()
+                .HasMaxLength(128);
+
+            entity.Property(r => r.Method)
+                .IsRequired()
+                .HasMaxLength(16);
+
+            entity.Property(r => r.Path)
+                .IsRequired()
+                .HasMaxLength(512);
+
+            entity.Property(r => r.RequestHash)
+                .IsRequired()
+                .HasMaxLength(64);
+
+            entity.Property(r => r.ResponseBody)
+                .HasMaxLength(65536);
+
+            entity.Property(r => r.CreatedAt)
+                .IsRequired()
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.HasIndex(r => new { r.OrganizationId, r.UserId, r.Key })
+                .IsUnique();
+
+            entity.HasIndex(r => r.CreatedAt);
+
+            entity.HasQueryFilter(r => r.OrganizationId == TenantId);
+        });
+    }
+
+    private static void ConfigureRevokedToken(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<RevokedToken>(entity =>
+        {
+            entity.ToTable("RevokedTokens");
+            entity.HasKey(t => t.Id);
+            entity.Property(t => t.Jti).IsRequired().HasMaxLength(64);
+            entity.HasIndex(t => t.Jti).IsUnique();
+            entity.HasIndex(t => t.ExpiresAt);
+            entity.Property(t => t.ExpiresAt).IsRequired();
+            entity.Property(t => t.RevokedAt)
+                .IsRequired()
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
         });
     }
 }

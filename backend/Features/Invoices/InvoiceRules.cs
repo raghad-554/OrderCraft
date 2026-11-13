@@ -19,7 +19,7 @@ public static class InvoiceRules
         if (order.Status is not OrderStatus.Approved
             and not OrderStatus.Shipped
             and not OrderStatus.Delivered)
-            return "Only Approved (or later) purchase orders can have an invoice.";
+            return "Only Approved (or later) orders can have an invoice.";
 
         if (InvoiceMoney.Remaining(order.TotalAmount, invoicedAmount) <= 0m)
             return "This order is already fully invoiced.";

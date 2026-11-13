@@ -27,16 +27,22 @@ internal static class OrderFieldHistory
 
     public static IReadOnlyList<Change> ForCreate(HeaderSnap header, IReadOnlyList<LineSnap> lines)
     {
-        var changes = new List<Change>();
-        Compare(changes, "Buyer", null, header.Buyer, includeUnchanged: true);
-        Compare(changes, "Vendor", null, header.Vendor, includeUnchanged: true);
-        Compare(changes, "Direction", null, header.Direction.ToString(), includeUnchanged: true);
-        Compare(changes, "Delivery date", null, FormatDate(header.DeliveryDate), includeUnchanged: true);
-        Compare(changes, "Payment terms", null, FormatTerms(header.PaymentTerms), includeUnchanged: true);
-        Compare(changes, "Tax rate", null, FormatTax(header.TaxRate), includeUnchanged: true);
-        Compare(changes, "Notes", null, BlankToNull(header.Notes), includeUnchanged: true);
+        var changes = new List<Change>
+        {
+            new("Created", null, FormatCreated(header)),
+        };
+
+        var terms = FormatTermsLine(header);
+        if (terms is not null)
+            changes.Add(new Change("Terms", null, terms));
+
+        var notes = BlankToNull(header.Notes);
+        if (notes is not null)
+            changes.Add(new Change("Notes", null, notes));
+
         foreach (var line in lines)
-            AddLine(changes, null, line);
+            changes.Add(new Change("Item", null, FormatLine(line)));
+
         return changes;
     }
 
@@ -47,9 +53,32 @@ internal static class OrderFieldHistory
         IReadOnlyList<LineSnap> afterLines)
     {
         var changes = new List<Change>();
-        AddHeader(changes, before, after, includeUnchanged: false);
+        AddHeader(changes, before, after);
         DiffLines(changes, beforeLines, afterLines);
         return changes;
+    }
+
+    /// <summary>
+    /// True when order content changed (ignores status-only transitions such as Rejected → Pending).
+    /// </summary>
+    public static bool HasContentChanges(
+        HeaderSnap before,
+        HeaderSnap after,
+        IReadOnlyList<LineSnap> beforeLines,
+        IReadOnlyList<LineSnap> afterLines,
+        string? beforeOrderNumber,
+        string? afterOrderNumber)
+    {
+        if (!string.Equals(
+                beforeOrderNumber?.Trim(),
+                afterOrderNumber?.Trim(),
+                StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        var changes = new List<Change>();
+        AddHeader(changes, before, after with { Status = before.Status }, includeStatus: false);
+        DiffLines(changes, beforeLines, afterLines);
+        return changes.Count > 0;
     }
 
     public static IReadOnlyList<Change> ForStatus(
@@ -73,17 +102,41 @@ internal static class OrderFieldHistory
     public static IReadOnlyList<Change> ForDelete(string orderNumber) =>
         [new Change("Order", orderNumber, null)];
 
-    private static void AddHeader(List<Change> changes, HeaderSnap before, HeaderSnap after, bool includeUnchanged)
+    /// <summary>
+    /// Lifecycle / status trail visible to anyone who can view the order.
+    /// Financial audit fields (Terms, Item, Notes, legacy price rows) are excluded unless elevated.
+    /// </summary>
+    public static bool IsStatusOrLifecycleField(string? field)
     {
-        Compare(changes, "Buyer", before.Buyer, after.Buyer, includeUnchanged);
-        Compare(changes, "Vendor", before.Vendor, after.Vendor, includeUnchanged);
-        Compare(changes, "Direction", before.Direction.ToString(), after.Direction.ToString(), includeUnchanged);
-        Compare(changes, "Delivery date", FormatDate(before.DeliveryDate), FormatDate(after.DeliveryDate), includeUnchanged);
-        Compare(changes, "Payment terms", FormatTerms(before.PaymentTerms), FormatTerms(after.PaymentTerms), includeUnchanged);
-        Compare(changes, "Tax rate", FormatTax(before.TaxRate), FormatTax(after.TaxRate), includeUnchanged);
-        Compare(changes, "Notes", BlankToNull(before.Notes), BlankToNull(after.Notes), includeUnchanged);
-        if (!includeUnchanged)
-            Compare(changes, "Status", before.Status.ToString(), after.Status.ToString(), includeUnchanged: false);
+        if (string.IsNullOrWhiteSpace(field))
+            return false;
+
+        return field.Equals("Created", StringComparison.OrdinalIgnoreCase)
+            || field.Equals("Status", StringComparison.OrdinalIgnoreCase)
+            || field.Equals("Rejection reason", StringComparison.OrdinalIgnoreCase)
+            || field.Equals("Order", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static void AddHeader(
+        List<Change> changes,
+        HeaderSnap before,
+        HeaderSnap after,
+        bool includeStatus = true)
+    {
+        var beforeCreated = FormatCreated(before);
+        var afterCreated = FormatCreated(after);
+        if (!string.Equals(beforeCreated, afterCreated, StringComparison.Ordinal))
+            changes.Add(new Change("Order", beforeCreated, afterCreated));
+
+        var beforeTerms = FormatTermsLine(before);
+        var afterTerms = FormatTermsLine(after);
+        if (!string.Equals(beforeTerms, afterTerms, StringComparison.Ordinal))
+            changes.Add(new Change("Terms", beforeTerms, afterTerms));
+
+        Compare(changes, "Notes", BlankToNull(before.Notes), BlankToNull(after.Notes));
+
+        if (includeStatus && before.Status != after.Status)
+            changes.Add(new Change("Status", before.Status.ToString(), after.Status.ToString()));
     }
 
     private static void DiffLines(List<Change> changes, IReadOnlyList<LineSnap> beforeLines, IReadOnlyList<LineSnap> afterLines)
@@ -102,38 +155,66 @@ internal static class OrderFieldHistory
 
             if (match < 0)
             {
-                AddLine(changes, before, null);
+                changes.Add(new Change("Item", FormatLine(before), null));
                 continue;
             }
 
             used.Add(match);
-            AddLine(changes, before, afterLines[match]);
+            var after = afterLines[match];
+            var beforeText = FormatLine(before);
+            var afterText = FormatLine(after);
+            if (!string.Equals(beforeText, afterText, StringComparison.Ordinal))
+                changes.Add(new Change("Item", beforeText, afterText));
         }
 
         for (var i = 0; i < afterLines.Count; i++)
         {
             if (!used.Contains(i))
-                AddLine(changes, null, afterLines[i]);
+                changes.Add(new Change("Item", null, FormatLine(afterLines[i])));
         }
     }
 
-    private static void AddLine(List<Change> changes, LineSnap? before, LineSnap? after)
+    private static string FormatCreated(HeaderSnap header) =>
+        header.Direction == OrderDirection.Sale
+            ? $"You sell to {BlankToNull(header.Buyer) ?? "client"}"
+            : $"You buy from {BlankToNull(header.Vendor) ?? "vendor"}";
+
+    private static string? FormatTermsLine(HeaderSnap header)
     {
-        var name = after?.ProductName ?? before?.ProductName ?? "Product";
-        Compare(changes, $"{name} / Product", before?.ProductName, after?.ProductName, includeUnchanged: before is null || after is null);
-        Compare(changes, $"{name} / Quantity", FormatQuantity(before?.Quantity), FormatQuantity(after?.Quantity), includeUnchanged: before is null || after is null);
-        Compare(changes, $"{name} / Unit price", FormatMoney(before?.UnitPrice), FormatMoney(after?.UnitPrice), includeUnchanged: before is null || after is null);
-        Compare(changes, $"{name} / Discount", FormatMoney(before?.DiscountAmount), FormatMoney(after?.DiscountAmount), includeUnchanged: before is null || after is null);
-        Compare(changes, $"{name} / Line total", FormatMoney(before?.TotalPrice), FormatMoney(after?.TotalPrice), includeUnchanged: before is null || after is null);
+        var parts = new List<string>();
+        var date = FormatDate(header.DeliveryDate);
+        if (date is not null)
+            parts.Add(date);
+        var terms = FormatTerms(header.PaymentTerms);
+        if (terms is not null)
+            parts.Add(terms);
+        parts.Add($"Tax {FormatTax(header.TaxRate)}");
+        return parts.Count == 0 ? null : string.Join(" · ", parts);
     }
 
-    private static void Compare(List<Change> changes, string field, string? oldValue, string? newValue, bool includeUnchanged)
+    private static string FormatLine(LineSnap line)
+    {
+        var name = BlankToNull(line.ProductName) ?? "Product";
+        var parts = new List<string>
+        {
+            name,
+            $"Qty: {line.Quantity}",
+            $"Unit: {FormatMoney(line.UnitPrice)}",
+        };
+        if (line.DiscountAmount > 0)
+            parts.Add($"Discount: {FormatMoney(line.DiscountAmount)}");
+        parts.Add($"Total: {FormatMoney(line.TotalPrice)}");
+
+        // ERP-style: labels through Discount, then arrow into Total.
+        var head = string.Join(" · ", parts.Take(parts.Count - 1));
+        return $"{head} → {parts[^1]}";
+    }
+
+    private static void Compare(List<Change> changes, string field, string? oldValue, string? newValue)
     {
         var before = BlankToNull(oldValue);
         var after = BlankToNull(newValue);
-        if (!includeUnchanged && string.Equals(before, after, StringComparison.Ordinal))
-            return;
-        if (includeUnchanged && before is null && after is null)
+        if (string.Equals(before, after, StringComparison.Ordinal))
             return;
         changes.Add(new Change(TrimField(field), before, after));
     }
@@ -158,9 +239,6 @@ internal static class OrderFieldHistory
     private static string FormatTax(decimal rate) =>
         rate.ToString("0.##", CultureInfo.InvariantCulture) + "%";
 
-    private static string? FormatQuantity(int? quantity) =>
-        quantity.HasValue ? quantity.Value.ToString(CultureInfo.InvariantCulture) : null;
-
-    private static string? FormatMoney(decimal? amount) =>
-        amount.HasValue ? amount.Value.ToString("0.00", CultureInfo.InvariantCulture) : null;
+    private static string FormatMoney(decimal amount) =>
+        amount.ToString("#,##0.00", CultureInfo.GetCultureInfo("en-US"));
 }

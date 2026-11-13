@@ -47,7 +47,8 @@ public class TenantMiddleware
                     tenant.SetPlatformAdmin();
                     var path = context.Request.Path.Value ?? "";
                     if (!path.StartsWith("/api/platform", StringComparison.OrdinalIgnoreCase)
-                        && !path.Equals("/api/Auth/change-password", StringComparison.OrdinalIgnoreCase))
+                        && !path.Equals("/api/Auth/change-password", StringComparison.OrdinalIgnoreCase)
+                        && !path.Equals("/api/Auth/logout", StringComparison.OrdinalIgnoreCase))
                     {
                         context.Response.StatusCode = StatusCodes.Status403Forbidden;
                         await context.Response.WriteAsJsonAsync(new { message = "Platform administrators cannot access tenant data." });

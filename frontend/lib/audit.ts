@@ -9,6 +9,7 @@ export type AuditLog = {
   entityId?: string | null;
   entityLabel?: string | null;
   summary?: string | null;
+  requestId?: string | null;
   createdAt: string;
 };
 

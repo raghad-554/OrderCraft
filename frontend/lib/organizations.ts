@@ -65,3 +65,55 @@ export function addExistingMember(
     body: JSON.stringify({ usernameOrEmail, departmentId, isOrgAdmin }),
   });
 }
+
+export type InvitationStatus = "Pending" | "Accepted" | "Revoked" | "Expired";
+
+export type OrganizationInvitation = {
+  id: string;
+  email: string;
+  departmentId: string;
+  departmentName: string;
+  isOrgAdmin: boolean;
+  status: InvitationStatus;
+  expiresAt: string;
+  createdAt: string;
+  invitedByUserId: string;
+  acceptToken?: string | null;
+};
+
+export function listInvitations() {
+  return apiFetch<OrganizationInvitation[]>("/api/Organizations/invitations");
+}
+
+export function createInvitation(
+  email: string,
+  departmentId: string,
+  isOrgAdmin = false,
+) {
+  return apiFetch<OrganizationInvitation>("/api/Organizations/invitations", {
+    method: "POST",
+    body: JSON.stringify({ email, departmentId, isOrgAdmin }),
+  });
+}
+
+export function revokeInvitation(invitationId: string) {
+  return apiFetch<void>(`/api/Organizations/invitations/${invitationId}/revoke`, {
+    method: "POST",
+  });
+}
+
+export function acceptInvitation(payload: {
+  token: string;
+  username?: string;
+  fullName?: string;
+  password?: string;
+}) {
+  return apiFetch<Employee>("/api/Organizations/invitations/accept", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function inviteAcceptPath(token: string) {
+  return `/invite?token=${encodeURIComponent(token)}`;
+}

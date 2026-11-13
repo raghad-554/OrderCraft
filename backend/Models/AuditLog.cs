@@ -36,5 +36,8 @@ public class AuditLog
     [MaxLength(1000)]
     public string? Summary { get; set; }
 
+    [MaxLength(64)]
+    public string? RequestId { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

@@ -8,7 +8,7 @@ import OrganizationChooser from "@/components/admin/OrganizationChooser";
 import SwitchOrganizationDialog from "@/components/admin/SwitchOrganizationDialog";
 import {
   applyOrganizationSession,
-  clearSession,
+  logoutSession,
   getSession,
   isAdmin,
   isPlatformAdminSession,
@@ -33,7 +33,7 @@ const FALLBACK_CATALOG: PageCatalogItem[] = [
   { key: "roles", label: "Roles", description: "", path: "/admin/employees/roles" },
   {
     key: "purchaseOrders",
-    label: "Purchase orders",
+    label: "Orders",
     description: "",
     path: "/admin/purchase-orders",
   },
@@ -120,8 +120,7 @@ export default function AdminLayout({
   }, [pathname, session, router]);
 
   function logout() {
-    clearSession();
-    router.replace("/login");
+    void logoutSession().then(() => router.replace("/login"));
   }
 
   if (!ready || !session) {

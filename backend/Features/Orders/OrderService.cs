@@ -83,7 +83,7 @@ public class OrderService : IOrderService
         CancellationToken cancellationToken = default)
     {
         if (request.Status is not OrderStatus.Draft and not OrderStatus.Pending)
-            return (null, "New purchase orders must be Draft or Pending.");
+            return (null, "New orders must be Draft or Pending.");
 
         var (parties, validationError) = await ResolvePartiesAsync(
             request.Direction,
@@ -153,7 +153,7 @@ public class OrderService : IOrderService
             entityType: "Order",
             entityId: order.Id.ToString(),
             entityLabel: order.OrderNumber,
-            summary: $"Purchase order created with status {order.Status}.",
+            summary: $"Order created with status {order.Status}.",
             cancellationToken: cancellationToken);
 
         var created = await GetByIdAsync(order.Id, cancellationToken);
@@ -173,7 +173,7 @@ public class OrderService : IOrderService
             return (null, null);
 
         if (!OrderStateMachine.CanEditDetails(order.Status))
-            return (null, "Only draft or rejected purchase orders can be edited.");
+            return (null, "Only draft or rejected orders can be edited.");
 
         var wasRejected = order.Status == OrderStatus.Rejected;
         var nextStatus = wasRejected ? OrderStatus.Pending : request.Status;
@@ -212,6 +212,46 @@ public class OrderService : IOrderService
         var beforeHeader = HeaderFrom(order);
         var beforeLines = LinesFrom(order.OrderItems, productNames);
 
+        var nextDeliveryDate = NormalizeOptionalUtc(request.DeliveryDate);
+        var nextTaxRate = NormalizeTaxRate(request.TaxRate);
+        var nextNotes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim();
+
+        var afterLines = request.OrderItems is { Count: > 0 }
+            ? LinesFrom(request.OrderItems.Select(line =>
+            {
+                var (discount, total) = OrderItemPricing.Price(line.Quantity, line.UnitPrice, line.DiscountAmount);
+                return new OrderItem
+                {
+                    ProductId = line.ProductId,
+                    Quantity = line.Quantity,
+                    UnitPrice = line.UnitPrice,
+                    DiscountAmount = discount,
+                    TotalPrice = total
+                };
+            }), productNames)
+            : beforeLines;
+
+        var proposedHeader = new OrderFieldHistory.HeaderSnap(
+            resolved.BuyerCompanyName,
+            resolved.SupplierCompanyName,
+            nextDeliveryDate,
+            request.PaymentTerms,
+            nextTaxRate,
+            nextNotes,
+            order.Status,
+            request.Direction);
+
+        if (wasRejected && !OrderFieldHistory.HasContentChanges(
+                beforeHeader,
+                proposedHeader,
+                beforeLines,
+                afterLines,
+                order.OrderNumber,
+                request.OrderNumber))
+        {
+            return (null, "Change at least one field before resubmitting.");
+        }
+
         order.OrderNumber = request.OrderNumber.Trim();
         order.Direction = request.Direction;
         order.BuyerCompanyId = resolved.BuyerCompanyId;
@@ -220,10 +260,10 @@ public class OrderService : IOrderService
         order.SupplierCompanyName = resolved.SupplierCompanyName;
         order.Status = nextStatus;
         order.OrderDate = NormalizeUtc(request.OrderDate);
-        order.DeliveryDate = NormalizeOptionalUtc(request.DeliveryDate);
+        order.DeliveryDate = nextDeliveryDate;
         order.PaymentTerms = request.PaymentTerms;
-        order.TaxRate = NormalizeTaxRate(request.TaxRate);
-        order.Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim();
+        order.TaxRate = nextTaxRate;
+        order.Notes = nextNotes;
 
         if (request.OrderItems is { Count: > 0 })
         {
@@ -263,20 +303,6 @@ public class OrderService : IOrderService
         var subtotal = order.OrderItems.Sum(i => i.TotalPrice);
         order.TotalAmount = ComputeGrandTotal(subtotal, order.TaxRate);
 
-        var afterLines = request.OrderItems is { Count: > 0 }
-            ? LinesFrom(request.OrderItems.Select(line =>
-            {
-                var (discount, total) = OrderItemPricing.Price(line.Quantity, line.UnitPrice, line.DiscountAmount);
-                return new OrderItem
-                {
-                    ProductId = line.ProductId,
-                    Quantity = line.Quantity,
-                    UnitPrice = line.UnitPrice,
-                    DiscountAmount = discount,
-                    TotalPrice = total
-                };
-            }), productNames)
-            : beforeLines;
         await AddFieldChangesAsync(
             order.Id,
             OrderFieldHistory.ForEdit(beforeHeader, HeaderFrom(order), beforeLines, afterLines),
@@ -295,8 +321,8 @@ public class OrderService : IOrderService
             entityId: order.Id.ToString(),
             entityLabel: order.OrderNumber,
             summary: wasRejected
-                ? "Purchase order details updated and resubmitted for approval."
-                : "Purchase order details updated.",
+                ? "Order details updated and resubmitted for approval."
+                : "Order details updated.",
             cancellationToken: cancellationToken);
 
         var updated = await GetByIdAsync(order.Id, cancellationToken);
@@ -324,11 +350,11 @@ public class OrderService : IOrderService
             var threshold = await CurrentApprovalThresholdAsync(cancellationToken);
             if (threshold > 0 && order.TotalAmount > threshold && !_tenant.IsOrgAdmin)
             {
-                return (null, "This purchase order is above the approval threshold and must be approved by an organization admin.");
+                return (null, "This order is above the approval threshold and must be approved by the authorized person.");
             }
 
             if (_tenant.UserId == order.CreatedByUserId && !_tenant.IsOrgAdmin)
-                return (null, "You cannot approve a purchase order you created.");
+                return (null, "You cannot approve an order you created.");
         }
 
         var previous = order.Status;
@@ -427,7 +453,7 @@ public class OrderService : IOrderService
             entityType: "Order",
             entityId: id.ToString(),
             entityLabel: orderNumber,
-            summary: "Purchase order soft-deleted.",
+            summary: "Order soft-deleted.",
             cancellationToken: cancellationToken);
 
         return true;
@@ -571,7 +597,7 @@ public class OrderService : IOrderService
         if (!exists)
             return null;
 
-        return await _dbContext.OrderFieldChanges
+        var rows = await _dbContext.OrderFieldChanges
             .AsNoTracking()
             .Where(c => c.OrderId == id)
             .OrderByDescending(c => c.CreatedAt)
@@ -586,7 +612,24 @@ public class OrderService : IOrderService
                 CreatedAt = c.CreatedAt
             })
             .ToListAsync(cancellationToken);
+
+        // Status/creation trail: any viewer. Financial audit (items, terms, discounts): Admin/Finance.
+        if (!CanViewFinancialOrderHistory())
+        {
+            rows = rows
+                .Where(c => OrderFieldHistory.IsStatusOrLifecycleField(c.Field))
+                .ToList();
+        }
+
+        return rows;
     }
+
+    /// <summary>
+    /// Org admins and Finance can audit financial field changes.
+    /// Operational roles (e.g. ProcurementManager) still see status/creation history only.
+    /// </summary>
+    private bool CanViewFinancialOrderHistory() =>
+        _tenant.IsOrgAdmin || _tenant.Role == UserRole.Finance;
 
     private async Task AddFieldChangesAsync(
         Guid orderId,

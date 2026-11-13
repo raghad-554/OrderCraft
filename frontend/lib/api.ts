@@ -13,6 +13,14 @@ export class ApiError extends Error {
   }
 }
 
+/** Fresh UUID for each intentional submit; reuse only when retrying the same click. */
+export function newIdempotencyKey(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `idem-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 export async function apiFetch<T>(
   path: string,
   init: RequestInit = {},

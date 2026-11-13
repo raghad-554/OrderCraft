@@ -1,6 +1,8 @@
 /** Client-side purchase-order PDF. Helvetica only — no print dialog. */
 
 export type PurchaseOrderPdfData = {
+  documentTitle: string;
+  numberLabel: string;
   orderNumber: string;
   vendor: string;
   buyer: string;
@@ -281,7 +283,7 @@ function drawHeader(page: Page, data: PurchaseOrderPdfData, continued: boolean) 
   drawText(page, "OrderCraft", MARGIN, PAGE_H - 36, 18, WHITE, true);
   drawText(
     page,
-    continued ? "Purchase order  -  continued" : "Purchase order",
+    continued ? `${data.documentTitle}  -  continued` : data.documentTitle,
     MARGIN,
     PAGE_H - 54,
     9,
@@ -289,8 +291,8 @@ function drawHeader(page: Page, data: PurchaseOrderPdfData, continued: boolean) 
   );
   drawText(
     page,
-    "PO NUMBER",
-    CONTENT_RIGHT - textWidth("PO NUMBER", 8, true),
+    data.numberLabel,
+    CONTENT_RIGHT - textWidth(data.numberLabel, 8, true),
     PAGE_H - 32,
     8,
     MUTED,

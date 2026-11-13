@@ -43,6 +43,57 @@ public class AddExistingMemberRequestValidator : AbstractValidator<AddExistingMe
     }
 }
 
+public class CreateInvitationRequest
+{
+    public string Email { get; set; } = string.Empty;
+    public Guid DepartmentId { get; set; }
+    public bool IsOrgAdmin { get; set; }
+}
+
+public class CreateInvitationRequestValidator : AbstractValidator<CreateInvitationRequest>
+{
+    public CreateInvitationRequestValidator()
+    {
+        RuleFor(x => x.Email).NotEmpty().EmailAddress().MaximumLength(256);
+        RuleFor(x => x.DepartmentId).NotEmpty();
+    }
+}
+
+public class AcceptInvitationRequest
+{
+    public string Token { get; set; } = string.Empty;
+    /// <summary>Required when no account exists yet for the invite email.</summary>
+    public string? Username { get; set; }
+    public string? FullName { get; set; }
+    public string? Password { get; set; }
+}
+
+public class AcceptInvitationRequestValidator : AbstractValidator<AcceptInvitationRequest>
+{
+    public AcceptInvitationRequestValidator()
+    {
+        RuleFor(x => x.Token).NotEmpty().MaximumLength(200);
+        RuleFor(x => x.Username).MaximumLength(50).When(x => !string.IsNullOrWhiteSpace(x.Username));
+        RuleFor(x => x.FullName).MaximumLength(100).When(x => !string.IsNullOrWhiteSpace(x.FullName));
+        RuleFor(x => x.Password).MinimumLength(6).When(x => !string.IsNullOrWhiteSpace(x.Password));
+    }
+}
+
+public class InvitationResponse
+{
+    public Guid Id { get; set; }
+    public string Email { get; set; } = string.Empty;
+    public Guid DepartmentId { get; set; }
+    public string DepartmentName { get; set; } = string.Empty;
+    public bool IsOrgAdmin { get; set; }
+    public InvitationStatus Status { get; set; }
+    public DateTime ExpiresAt { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public Guid InvitedByUserId { get; set; }
+    /// <summary>Raw token — only returned once on create.</summary>
+    public string? AcceptToken { get; set; }
+}
+
 public class SwitchOrganizationRequest
 {
     public string Password { get; set; } = string.Empty;

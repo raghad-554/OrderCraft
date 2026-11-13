@@ -94,6 +94,7 @@ export default function AuditLogBoard() {
         row.entityType,
         row.entityLabel,
         row.summary,
+        row.requestId,
       ]
         .filter(Boolean)
         .join(" ")
@@ -193,7 +194,7 @@ export default function AuditLogBoard() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search summary or related item…"
+            placeholder="Search summary, request id, or related item…"
             className="w-full rounded-2xl border border-black/[0.06] bg-white px-4 py-2.5 text-sm font-medium text-[#0B1220] outline-none ring-[#051A2D]/30 placeholder:text-[#8B95A5] focus:ring-2"
           />
         </label>
@@ -218,18 +219,19 @@ export default function AuditLogBoard() {
                 <th className="px-5 py-3.5">Action</th>
                 <th className="px-5 py-3.5">Related to</th>
                 <th className="px-5 py-3.5">Details</th>
+                <th className="px-5 py-3.5">Request</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="px-5 py-12 text-center text-[#8B95A5]">
+                  <td colSpan={6} className="px-5 py-12 text-center text-[#8B95A5]">
                     Loading audit log…
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-5 py-12 text-center text-[#8B95A5]">
+                  <td colSpan={6} className="px-5 py-12 text-center text-[#8B95A5]">
                     {employeeId === "All"
                       ? "No activity yet. Sign in, edit an employee, or change permissions to start tracking."
                       : "No activity for this employee yet."}
@@ -265,6 +267,9 @@ export default function AuditLogBoard() {
                       <td className="max-w-md px-5 py-3.5 text-[#4B5563]">
                         {row.summary || "—"}
                       </td>
+                      <td className="whitespace-nowrap px-5 py-3.5">
+                        <RequestIdChip requestId={row.requestId} />
+                      </td>
                     </tr>
                   );
                 })
@@ -274,6 +279,38 @@ export default function AuditLogBoard() {
         </div>
       </div>
     </div>
+  );
+}
+
+function RequestIdChip({ requestId }: { requestId?: string | null }) {
+  const [copied, setCopied] = useState(false);
+
+  if (!requestId) {
+    return <span className="text-[#8B95A5]">—</span>;
+  }
+
+  const short =
+    requestId.length > 10 ? `${requestId.slice(0, 8)}…` : requestId;
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(requestId!);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1200);
+    } catch {
+      // Clipboard may be blocked; still allow selecting via title.
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      title={copied ? "Copied" : `Copy request id\n${requestId}`}
+      onClick={copy}
+      className="inline-flex max-w-[9.5rem] items-center rounded-md border border-black/[0.06] bg-[#F8FAFB] px-2 py-1 font-mono text-[11px] text-[#4B5563] transition hover:border-black/[0.12] hover:bg-white"
+    >
+      {copied ? "Copied" : short}
+    </button>
   );
 }
 

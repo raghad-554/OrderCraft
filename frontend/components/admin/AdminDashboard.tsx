@@ -11,7 +11,7 @@ import { formatMoney } from "@/lib/orders";
 import { canViewPage } from "@/lib/permissions";
 
 const shortcuts = [
-  { label: "Purchase Orders", href: "/admin/purchase-orders", hint: "Create and track POs", pageKey: "purchaseOrders" },
+  { label: "Orders", href: "/admin/purchase-orders", hint: "Purchase and sales orders", pageKey: "purchaseOrders" },
   { label: "Invoices", href: "/admin/invoices", hint: "Billing status", pageKey: "invoices" },
   { label: "Companies", href: "/admin/companies", hint: "Clients and vendors", pageKey: "companies" },
   { label: "Products", href: "/admin/products", hint: "Vendor catalog", pageKey: "products" },
@@ -81,7 +81,7 @@ export default function AdminDashboard() {
 
       <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
         <KpiCard
-          label="Purchase orders"
+          label="Orders"
           value={loading ? "…" : String(data?.orders.total ?? 0)}
           hint={
             loading
@@ -91,7 +91,7 @@ export default function AdminDashboard() {
           href="/admin/purchase-orders"
         />
         <KpiCard
-          label="Approved POs"
+          label="Approved orders"
           value={loading ? "…" : String(data?.orders.approved ?? 0)}
           hint="Ready for fulfillment"
           href="/admin/purchase-orders"

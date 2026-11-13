@@ -1,4 +1,4 @@
-import { apiFetch } from "@/lib/api";
+import { apiFetch, newIdempotencyKey } from "@/lib/api";
 import { buildPurchaseOrderPdf } from "@/lib/order-pdf";
 import type { Product } from "@/lib/products";
 import { listProducts } from "@/lib/products";
@@ -140,14 +140,19 @@ export function listOrders() {
   return apiFetch<PurchaseOrder[]>("/api/Orders");
 }
 
+export function getOrder(id: string) {
+  return apiFetch<PurchaseOrder>(`/api/Orders/${id}`);
+}
+
 export function listOrderHistory(id: string) {
   return apiFetch<OrderFieldChange[]>(`/api/Orders/${id}/history`);
 }
 
-export function createOrder(payload: CreateOrderPayload) {
+export function createOrder(payload: CreateOrderPayload, idempotencyKey?: string) {
   return apiFetch<PurchaseOrder>("/api/Orders", {
     method: "POST",
     body: JSON.stringify(payload),
+    headers: { "Idempotency-Key": idempotencyKey ?? newIdempotencyKey() },
   });
 }
 
@@ -181,6 +186,18 @@ const PO_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   Delivered: [],
   Cancelled: [],
 };
+
+export function nextOrderStatuses(from: OrderStatus): OrderStatus[] {
+  return PO_TRANSITIONS[from] ?? [];
+}
+
+export function statusActionLabel(from: OrderStatus, to: OrderStatus) {
+  if (to === "Approved" && from === "Pending") return "Approve";
+  if (to === "Rejected") return "Reject";
+  if (to === "Pending" && from === "Draft") return "Submit";
+  if (to === "Pending" && from === "Rejected") return "Resubmit";
+  return to;
+}
 
 export function canEditOrderDetails(status: OrderStatus) {
   return status === "Draft" || status === "Rejected";
@@ -229,16 +246,16 @@ export function approveBlockedMessage(
   admin: boolean,
 ) {
   if (orderNeedsAdminApproval(order) && !admin) {
-    return "This purchase order is above the approval threshold and must be approved by an organization admin.";
+    return "This order is above the approval threshold and must be approved by the authorized person.";
   }
   if (
     !!userId &&
     order.createdByUserId.toLowerCase() === userId.toLowerCase() &&
     !admin
   ) {
-    return "You cannot approve a purchase order you created.";
+    return "You cannot approve an order you created.";
   }
-  return "You cannot approve this purchase order.";
+  return "You cannot approve this order.";
 }
 
 export function canInvoiceOrder(order: {
@@ -258,9 +275,10 @@ export function canInvoiceOrder(order: {
   );
 }
 
-export function generateInvoiceFromOrder(orderId: string) {
+export function generateInvoiceFromOrder(orderId: string, idempotencyKey?: string) {
   return apiFetch<Invoice>(`/api/Orders/${orderId}/invoice`, {
     method: "POST",
+    headers: { "Idempotency-Key": idempotencyKey ?? newIdempotencyKey() },
   });
 }
 
@@ -425,7 +443,7 @@ export function exportOrdersExcel(
   ];
 
   const summaryRows: XlsxCell[][] = [
-    [xlsxText("OrderCraft  |  Purchase orders", XLSX_STYLE.title)],
+    [xlsxText("OrderCraft  |  Orders", XLSX_STYLE.title)],
     xlsxHeaderRow(summaryHeaders),
     ...orders.map((order, index) => {
       const { items, subtotal, discount, taxRate, tax, total } = orderMoneyParts(order);
@@ -505,7 +523,7 @@ export function exportOrdersExcel(
 
   const bytes = buildXlsx([
     {
-      name: "Purchase orders",
+      name: "Orders",
       widths: [22, 28, 28, 16, 16, 16, 14, 14, 13, 13, 14, 14, 16, 24, 10, 36, 28],
       rows: summaryRows,
     },
@@ -525,7 +543,10 @@ export function exportOrdersExcel(
 
 export function downloadOrderPdf(order: PurchaseOrder) {
   const { items, subtotal, discount, taxRate, tax, total } = orderMoneyParts(order);
+  const isSale = order.direction === "Sale";
   const bytes = buildPurchaseOrderPdf({
+    documentTitle: isSale ? "Sales order" : "Purchase order",
+    numberLabel: isSale ? "SO NUMBER" : "PO NUMBER",
     orderNumber: order.orderNumber,
     vendor: order.supplierCompanyName || "—",
     buyer: order.buyerCompanyName || "—",

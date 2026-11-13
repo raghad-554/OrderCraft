@@ -150,6 +150,55 @@ public class OrganizationsController : ControllerBase
         return NoContent();
     }
 
+    [HttpGet("invitations")]
+    [RequirePage("employees")]
+    public async Task<IActionResult> ListInvitations(CancellationToken cancellationToken)
+    {
+        return Ok(await _organizationService.ListInvitationsAsync(cancellationToken));
+    }
+
+    [HttpPost("invitations")]
+    [RequirePage("employees")]
+    public async Task<IActionResult> CreateInvitation(
+        [FromBody] CreateInvitationRequest request,
+        CancellationToken cancellationToken)
+    {
+        var (invitation, error) = await _organizationService.CreateInvitationAsync(request, cancellationToken);
+        if (error is not null)
+            return BadRequest(new { message = error });
+
+        return Ok(invitation);
+    }
+
+    [HttpPost("invitations/{invitationId:guid}/revoke")]
+    [RequirePage("employees")]
+    public async Task<IActionResult> RevokeInvitation(Guid invitationId, CancellationToken cancellationToken)
+    {
+        var (ok, error) = await _organizationService.RevokeInvitationAsync(invitationId, cancellationToken);
+        if (!ok)
+            return BadRequest(new { message = error });
+
+        return NoContent();
+    }
+
+    [HttpPost("invitations/accept")]
+    [AllowAnonymous]
+    [AllowNoOrganization]
+    public async Task<IActionResult> AcceptInvitation(
+        [FromBody] AcceptInvitationRequest request,
+        CancellationToken cancellationToken)
+    {
+        Guid? actingUserId = TryGetUserId(out var userId) ? userId : null;
+        var (member, error) = await _organizationService.AcceptInvitationAsync(
+            request,
+            actingUserId,
+            cancellationToken);
+        if (error is not null)
+            return BadRequest(new { message = error });
+
+        return Ok(member);
+    }
+
     private bool TryGetUserId(out Guid userId)
     {
         var raw =

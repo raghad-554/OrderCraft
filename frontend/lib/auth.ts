@@ -209,8 +209,36 @@ export function clearSession() {
   localStorage.removeItem("ordercraft_user");
 }
 
+/** Revoke the current JWT on the server, then clear local session storage. */
+export async function logoutSession() {
+  const token = getAuthToken();
+  if (token) {
+    try {
+      const apiBase =
+        process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ||
+        "http://localhost:5069";
+      await fetch(`${apiBase}/api/Auth/logout`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch {
+      // Still clear local session even if the network call fails.
+    }
+  }
+  clearSession();
+}
+
 export function isAdmin(role: string) {
   return role.toLowerCase() === "admin";
+}
+
+export function isFinance(role: string) {
+  return role.toLowerCase() === "finance";
+}
+
+/** Org admin / Finance can see full financial field-change audit on orders. */
+export function canViewOrderFinancialHistory(role: string) {
+  return isAdmin(role) || isFinance(role);
 }
 
 export function applyOrganizationSession(

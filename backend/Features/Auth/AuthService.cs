@@ -14,6 +14,7 @@ public class AuthService : IAuthService
     private readonly IOrganizationService _organizationService;
     private readonly IAuditService _auditService;
     private readonly ITenantContext _tenant;
+    private readonly ITokenRevocationService _tokenRevocation;
 
     public AuthService(
         ApplicationDbContext dbContext,
@@ -22,7 +23,8 @@ public class AuthService : IAuthService
         IPermissionService permissionService,
         IOrganizationService organizationService,
         IAuditService auditService,
-        ITenantContext tenant)
+        ITenantContext tenant,
+        ITokenRevocationService tokenRevocation)
     {
         _dbContext = dbContext;
         _passwordService = passwordService;
@@ -31,6 +33,31 @@ public class AuthService : IAuthService
         _organizationService = organizationService;
         _auditService = auditService;
         _tenant = tenant;
+        _tokenRevocation = tokenRevocation;
+    }
+
+    public async Task LogoutAsync(CancellationToken cancellationToken = default)
+    {
+        await _tokenRevocation.RevokeCurrentAsync(cancellationToken);
+
+        if (_tenant.UserId is Guid userId)
+        {
+            var name = await _dbContext.Users
+                .AsNoTracking()
+                .Where(u => u.Id == userId)
+                .Select(u => u.FullName)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            await _auditService.RecordAsync(
+                action: "Logout",
+                entityType: "Employee",
+                entityId: userId.ToString(),
+                entityLabel: name ?? "User",
+                summary: "Signed out; session token revoked.",
+                actorUserId: userId,
+                actorName: name,
+                cancellationToken: cancellationToken);
+        }
     }
 
     public async Task<LoginResponse?> LoginAsync(
@@ -203,6 +230,9 @@ public class AuthService : IAuthService
         }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+
+        // Kill the current JWT so a stolen copy cannot keep working after the password change.
+        await _tokenRevocation.RevokeCurrentAsync(cancellationToken);
 
         await _auditService.RecordAsync(
             action: "PasswordChanged",

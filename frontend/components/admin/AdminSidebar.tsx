@@ -14,7 +14,7 @@ const navItems = [
   { href: "/admin/companies", label: "Company", pageKey: "companies" },
   { href: "/admin/products", label: "Products", pageKey: "products" },
   { href: "/admin/employees", label: "Employee", pageKey: "employees" },
-  { href: "/admin/purchase-orders", label: "Purchase Order", pageKey: "purchaseOrders" },
+  { href: "/admin/purchase-orders", label: "Orders", pageKey: "purchaseOrders" },
   { href: "/admin/invoices", label: "Invoices", pageKey: "invoices" },
   { href: "/admin/audit-log", label: "Audit Log", pageKey: "auditLog" },
   { href: "/admin/settings", label: "Setting", pageKey: "settings" },
@@ -52,7 +52,7 @@ function NavIcon({ label }: { label: string }) {
           <path strokeLinecap="round" d="M3.5 19a5.5 5.5 0 0 1 11 0" />
         </svg>
       );
-    case "Purchase Order":
+    case "Orders":
       return (
         <svg className={common} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
           <path strokeLinecap="round" d="M7 4h10l1 16H6L7 4Z" />

@@ -27,6 +27,22 @@ public interface IOrganizationService
         MembershipStatus status,
         CancellationToken cancellationToken = default);
 
+    Task<(InvitationResponse? Invitation, string? Error)> CreateInvitationAsync(
+        CreateInvitationRequest request,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<InvitationResponse>> ListInvitationsAsync(
+        CancellationToken cancellationToken = default);
+
+    Task<(bool Ok, string? Error)> RevokeInvitationAsync(
+        Guid invitationId,
+        CancellationToken cancellationToken = default);
+
+    Task<(UserResponse? Member, string? Error)> AcceptInvitationAsync(
+        AcceptInvitationRequest request,
+        Guid? actingUserId,
+        CancellationToken cancellationToken = default);
+
     Task<OrganizationSettingsResponse?> GetSettingsAsync(CancellationToken cancellationToken = default);
 
     Task<(OrganizationSettingsResponse? Settings, string? Error)> UpdateSettingsAsync(

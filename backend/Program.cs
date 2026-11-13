@@ -136,9 +136,12 @@ if (!app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 
 app.UseRouting();
+app.UseMiddleware<RequestIdMiddleware>();
+app.UseMiddleware<CancellationExceptionMiddleware>();
 app.UseAuthentication();
 app.UseMiddleware<TenantMiddleware>();
 app.UseAuthorization();
+app.UseMiddleware<IdempotencyMiddleware>();
 
 app.MapOrderCraftRoutes();
 
@@ -148,6 +151,13 @@ if (app.Environment.IsDevelopment())
         .ExcludeFromDescription();
     app.MapGet("/swagger/index.html", () => Results.Redirect("/"))
         .ExcludeFromDescription();
+
+    // Manual cancel probe: call then abort the client — server returns 499, not 500.
+    app.MapGet("/api/dev/hang", async (HttpContext context) =>
+    {
+        await Task.Delay(Timeout.Infinite, context.RequestAborted);
+        return Results.Ok(new { message = "unreachable" });
+    }).ExcludeFromDescription();
 }
 
 app.Run();

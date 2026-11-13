@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import ChangePasswordDialog from "@/components/admin/ChangePasswordDialog";
 import {
-  clearSession,
+  logoutSession,
   getSession,
   isPlatformAdminSession,
 } from "@/lib/auth";
@@ -61,8 +61,7 @@ export default function PlatformLayout({
             <button
               type="button"
               onClick={() => {
-                clearSession();
-                router.replace("/login");
+                void logoutSession().then(() => router.replace("/login"));
               }}
               className="rounded-full bg-[#051A2D] px-4 py-2 text-xs font-bold text-white"
             >

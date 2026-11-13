@@ -10,5 +10,6 @@ public class AuditLogResponse
     public string? EntityId { get; set; }
     public string? EntityLabel { get; set; }
     public string? Summary { get; set; }
+    public string? RequestId { get; set; }
     public DateTime CreatedAt { get; set; }
 }

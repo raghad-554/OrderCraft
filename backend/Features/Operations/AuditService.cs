@@ -60,7 +60,8 @@ public class AuditService : IAuditService
                 || EF.Functions.ILike(a.Action, term)
                 || EF.Functions.ILike(a.EntityType, term)
                 || (a.EntityLabel != null && EF.Functions.ILike(a.EntityLabel, term))
-                || (a.Summary != null && EF.Functions.ILike(a.Summary, term)));
+                || (a.Summary != null && EF.Functions.ILike(a.Summary, term))
+                || (a.RequestId != null && EF.Functions.ILike(a.RequestId, term)));
         }
 
         var rows = await query
@@ -83,6 +84,9 @@ public class AuditService : IAuditService
     {
         var (resolvedUserId, resolvedName) = ResolveActor(actorUserId, actorName);
 
+        var http = _httpContextAccessor.HttpContext;
+        var requestId = http is null ? null : RequestCorrelation.Get(http);
+
         var entry = new AuditLog
         {
             OrganizationId = _tenant.OrganizationId,
@@ -93,6 +97,7 @@ public class AuditService : IAuditService
             EntityId = string.IsNullOrWhiteSpace(entityId) ? null : entityId.Trim(),
             EntityLabel = string.IsNullOrWhiteSpace(entityLabel) ? null : entityLabel.Trim(),
             Summary = string.IsNullOrWhiteSpace(summary) ? null : summary.Trim(),
+            RequestId = string.IsNullOrWhiteSpace(requestId) ? null : requestId.Trim(),
             CreatedAt = DateTime.UtcNow
         };
 
@@ -135,6 +140,7 @@ public class AuditService : IAuditService
         EntityId = log.EntityId,
         EntityLabel = log.EntityLabel,
         Summary = log.Summary,
+        RequestId = log.RequestId,
         CreatedAt = log.CreatedAt
     };
 }

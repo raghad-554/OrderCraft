@@ -11,7 +11,7 @@ import {
 } from "react";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import { ApiError } from "@/lib/api";
-import { getSession, isAdmin } from "@/lib/auth";
+import { canViewOrderFinancialHistory, getSession, isAdmin } from "@/lib/auth";
 import { listCompanies, type Company } from "@/lib/companies";
 import { canEditPage } from "@/lib/permissions";
 import {
@@ -24,11 +24,13 @@ import {
   PAYMENT_TERMS,
   approveBlockedMessage,
   canApproveOrder,
-  orderNeedsAdminApproval,
   canEditOrderDetails,
   canInvoiceOrder,
   canTransitionOrder,
+  nextOrderStatuses,
+  statusActionLabel,
   createOrder,
+  getOrder,
   updateOrder,
   downloadOrderPdf,
   exportOrdersExcel,
@@ -71,8 +73,227 @@ function emptyLine(): LineForm {
   };
 }
 
-function historyValue(value?: string | null) {
-  return value?.trim() ? value : "—";
+function orderKindLabel(direction: OrderDirection) {
+  return direction === "Sale" ? "Sales order" : "Purchase order";
+}
+
+function orderNumberLabel(direction: OrderDirection) {
+  return direction === "Sale" ? "SO number" : "PO number";
+}
+
+function orderDirectionLabel(direction: OrderDirection) {
+  return direction === "Sale" ? "You sell" : "You buy";
+}
+
+function orderPartiesLine(order: {
+  direction: OrderDirection;
+  supplierCompanyName?: string | null;
+  buyerCompanyName?: string | null;
+}) {
+  if (order.direction === "Sale") {
+    return order.buyerCompanyName || "—";
+  }
+  return order.supplierCompanyName || "—";
+}
+
+function historyFieldLabel(field: string, direction: OrderDirection) {
+  if (direction === "Sale") {
+    if (field === "Buyer") return "Client";
+    if (field === "Vendor") return "Seller";
+  }
+  return field;
+}
+
+function historyFieldValue(field: string, value?: string | null) {
+  const trimmed = value?.trim();
+  if (!trimmed) return "";
+  if (field === "Direction") {
+    if (trimmed === "Sale") return "You sell";
+    if (trimmed === "Purchase") return "You buy";
+  }
+  return trimmed;
+}
+
+const LEGACY_HEADER_FIELDS = new Set([
+  "Buyer",
+  "Vendor",
+  "Client",
+  "Seller",
+  "Direction",
+  "Delivery date",
+  "Payment terms",
+  "Tax rate",
+]);
+
+/** Collapse noisy legacy rows into short Created / Terms / Item lines. */
+function compactHistoryChanges(
+  changes: OrderFieldChange[],
+  direction: OrderDirection,
+): { id: string; text: string }[] {
+  const rows: { id: string; text: string }[] = [];
+  const lineBuckets = new Map<
+    string,
+    { id: string; product?: string; qty?: string; price?: string; discount?: string; total?: string }
+  >();
+  const legacyHeader: Record<string, string> = {};
+  let legacyHeaderId = "";
+  const legacyIsCreate = changes
+    .filter((c) => LEGACY_HEADER_FIELDS.has(c.field))
+    .every((c) => !historyFieldValue(c.field, c.oldValue));
+
+  for (const change of changes) {
+    const lineMatch = change.field.match(
+      /^(.+) \/ (Product|Quantity|Unit price|Discount|Line total)$/,
+    );
+    if (lineMatch) {
+      const [, productName, part] = lineMatch;
+      const bucket =
+        lineBuckets.get(productName) ??
+        ({ id: change.id } as {
+          id: string;
+          product?: string;
+          qty?: string;
+          price?: string;
+          discount?: string;
+          total?: string;
+        });
+      const value =
+        historyFieldValue(change.field, change.newValue) ||
+        historyFieldValue(change.field, change.oldValue);
+      if (part === "Product") bucket.product = value;
+      if (part === "Quantity") bucket.qty = value;
+      if (part === "Unit price") bucket.price = value;
+      if (part === "Discount") bucket.discount = value;
+      if (part === "Line total") bucket.total = value;
+      lineBuckets.set(productName, bucket);
+      continue;
+    }
+
+    if (legacyIsCreate && LEGACY_HEADER_FIELDS.has(change.field)) {
+      const value = historyFieldValue(change.field, change.newValue);
+      if (value) {
+        legacyHeader[change.field] = value;
+        if (!legacyHeaderId) legacyHeaderId = change.id;
+      }
+      continue;
+    }
+
+    const label = historyFieldLabel(change.field, direction);
+    const oldValue = formatHistoryMoneyText(
+      historyFieldValue(change.field, change.oldValue),
+      change.field,
+    );
+    const newValue = formatHistoryMoneyText(
+      historyFieldValue(change.field, change.newValue),
+      change.field,
+    );
+    if (!oldValue && !newValue) continue;
+    if (!oldValue && newValue) {
+      rows.push({ id: change.id, text: `${label}: ${newValue}` });
+      continue;
+    }
+    if (oldValue && !newValue) {
+      rows.push({ id: change.id, text: `${label}: removed ${oldValue}` });
+      continue;
+    }
+    // Item before/after on separate labeled rows so long ERP lines stay readable.
+    if (/^Item$/i.test(change.field)) {
+      rows.push({ id: change.id, text: `Before · ${label}: ${oldValue}` });
+      rows.push({
+        id: `${change.id}-after`,
+        text: `After · ${label}: ${newValue}`,
+      });
+      continue;
+    }
+    rows.push({ id: change.id, text: `${label}: ${oldValue} → ${newValue}` });
+  }
+
+  if (Object.keys(legacyHeader).length > 0) {
+    const dir =
+      legacyHeader.Direction ||
+      (direction === "Sale" ? "You sell" : "You buy");
+    const partner =
+      direction === "Sale"
+        ? legacyHeader.Client || legacyHeader.Buyer
+        : legacyHeader.Vendor;
+    const created =
+      direction === "Sale"
+        ? `${dir} to ${partner || "client"}`
+        : `${dir} from ${partner || "vendor"}`;
+    rows.unshift({ id: `${legacyHeaderId}-created`, text: `Created: ${created}` });
+
+    const termsParts = [
+      legacyHeader["Delivery date"],
+      legacyHeader["Payment terms"],
+      legacyHeader["Tax rate"] ? `Tax ${legacyHeader["Tax rate"]}` : "",
+    ].filter(Boolean);
+    if (termsParts.length > 0) {
+      rows.splice(1, 0, {
+        id: `${legacyHeaderId}-terms`,
+        text: `Terms: ${termsParts.join(" · ")}`,
+      });
+    }
+  }
+
+  Array.from(lineBuckets.entries()).forEach(([name, bucket]) => {
+    const product = bucket.product || name;
+    const qty = bucket.qty || "?";
+    const price = formatPlainMoney(bucket.price || "0.00");
+    const discountNum = Number(String(bucket.discount || "0").replace(/,/g, ""));
+    const parts = [`Item: ${product}`, `Qty: ${qty}`, `Unit: ${price}`];
+    if (Number.isFinite(discountNum) && discountNum > 0) {
+      parts.push(`Discount: ${formatPlainMoney(bucket.discount || "0")}`);
+    }
+    const total = bucket.total ? formatPlainMoney(bucket.total) : "";
+    const head = parts.join(" · ");
+    rows.push({
+      id: bucket.id,
+      text: total ? `${head} → Total: ${total}` : head,
+    });
+  });
+
+  return rows;
+}
+
+/** Normalize stored Item math lines into ERP labeled form. */
+function formatHistoryMoneyText(value: string, field: string) {
+  if (!value) return value;
+  if (!/^Item$/i.test(field)) return value;
+  return rewriteLegacyItemLine(value);
+}
+
+function formatPlainMoney(raw: string) {
+  const n = Number(String(raw).replace(/[$,]/g, "").trim());
+  if (!Number.isFinite(n)) return raw;
+  return n.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function rewriteLegacyItemLine(value: string) {
+  // tools · 5 × 80000.00 (−200000.00) = 200000.00
+  const match = value.match(
+    /^(.+?) · (\d+)\s*[×x]\s*([0-9.,]+)(?:\s*\([−\-]?([0-9.,]+)\))?\s*=\s*([0-9.,]+)$/i,
+  );
+  if (!match) {
+    // Already labeled, or unknown — still tidy bare money tokens if present.
+    if (/Qty:\s*\d+/i.test(value)) return value;
+    return value;
+  }
+  const [, product, qty, unit, discount, total] = match;
+  const parts = [
+    product.trim(),
+    `Qty: ${qty}`,
+    `Unit: ${formatPlainMoney(unit)}`,
+  ];
+  if (discount) {
+    const d = Number(String(discount).replace(/,/g, ""));
+    if (Number.isFinite(d) && d > 0) {
+      parts.push(`Discount: ${formatPlainMoney(discount)}`);
+    }
+  }
+  return `${parts.join(" · ")} → Total: ${formatPlainMoney(total)}`;
 }
 
 function groupFieldHistory(rows: OrderFieldChange[]) {
@@ -144,19 +365,78 @@ function toDateInputValue(date = new Date()) {
   return `${y}-${m}-${d}`;
 }
 
-function nextPoNumber() {
+function nextOrderNumber(direction: OrderDirection) {
+  const prefix = direction === "Sale" ? "SO" : "PO";
   const stamp = new Date();
   const y = stamp.getFullYear();
   const m = String(stamp.getMonth() + 1).padStart(2, "0");
   const d = String(stamp.getDate()).padStart(2, "0");
   const r = Math.floor(Math.random() * 900 + 100);
-  return `PO-${y}${m}${d}-${r}`;
+  return `${prefix}-${y}${m}${d}-${r}`;
+}
+
+function withDirectionPrefix(orderNumber: string, direction: OrderDirection) {
+  const prefix = direction === "Sale" ? "SO" : "PO";
+  if (/^(PO|SO)-/i.test(orderNumber)) {
+    return orderNumber.replace(/^(PO|SO)-/i, `${prefix}-`);
+  }
+  return orderNumber;
+}
+
+function sameMoney(a: number, b: number) {
+  return roundMoney(a) === roundMoney(b);
+}
+
+function rejectedResubmitUnchanged(
+  order: PurchaseOrder,
+  form: {
+    orderNumber: string;
+    direction: OrderDirection;
+    partnerCompanyId: string;
+    deliveryDate: string;
+    paymentTerms: PaymentTerms | "";
+    taxRate: string;
+    notes: string;
+    lines: { productId: string; quantity: number; unitPrice: number; discount: number }[];
+  },
+) {
+  const partnerId =
+    order.partnerCompanyId ||
+    (order.direction === "Sale" ? order.buyerCompanyId : order.supplierCompanyId) ||
+    "";
+  if (order.orderNumber.trim().toLowerCase() !== form.orderNumber.trim().toLowerCase()) {
+    return false;
+  }
+  if ((order.direction === "Sale" ? "Sale" : "Purchase") !== form.direction) return false;
+  if ((partnerId || "") !== form.partnerCompanyId) return false;
+  const orderDelivery = order.deliveryDate
+    ? toDateInputValue(new Date(order.deliveryDate))
+    : "";
+  if (orderDelivery !== form.deliveryDate) return false;
+  if ((order.paymentTerms ?? "") !== form.paymentTerms) return false;
+  if (!sameMoney(Number(order.taxRate || 0), Number(form.taxRate || 0))) return false;
+  if ((order.notes ?? "").trim() !== form.notes.trim()) return false;
+
+  const before = order.orderItems ?? [];
+  if (before.length !== form.lines.length) return false;
+  for (let i = 0; i < before.length; i++) {
+    const left = before[i];
+    const right = form.lines[i];
+    if (left.productId !== right.productId) return false;
+    if (Number(left.quantity) !== right.quantity) return false;
+    if (!sameMoney(Number(left.unitPrice), right.unitPrice)) return false;
+    if (!sameMoney(Number(left.discountAmount || 0), right.discount)) return false;
+  }
+  return true;
 }
 
 export default function PurchaseOrderBoard() {
   const session = getSession();
   const organizationName = session?.organization?.name?.trim() || "Your organization";
   const admin = isAdmin(session?.user.role ?? "");
+  const canSeeFinancialHistory = canViewOrderFinancialHistory(
+    session?.user.role ?? "",
+  );
   const currentUserId = session?.user.id;
   const canEdit = canEditPage(
     session?.permissions,
@@ -182,7 +462,6 @@ export default function PurchaseOrderBoard() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [detailOrder, setDetailOrder] = useState<PurchaseOrder | null>(null);
-  const [detailStatus, setDetailStatus] = useState<OrderStatus>("Pending");
   const [fieldHistory, setFieldHistory] = useState<OrderFieldChange[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
@@ -222,7 +501,7 @@ export default function PurchaseOrderBoard() {
           ? err.message
           : err instanceof Error
             ? err.message
-            : "Failed to load purchase orders.",
+            : "Failed to load orders.",
       );
     } finally {
       setLoading(false);
@@ -242,13 +521,21 @@ export default function PurchaseOrderBoard() {
     [companies],
   );
   const partners = direction === "Sale" ? buyers : vendors;
-  const lineProducts = useMemo(
-    () =>
+  const lineProducts = useMemo(() => {
+    const scoped =
       direction === "Purchase"
         ? products.filter((p) => p.companyId === partnerCompanyId)
-        : products,
-    [direction, products, partnerCompanyId],
-  );
+        : products;
+    // Keep selected line products visible while editing even if catalog filter changes.
+    const selectedIds = new Set(
+      lines.map((line) => line.productId).filter(Boolean),
+    );
+    if (selectedIds.size === 0) return scoped;
+    const missing = products.filter(
+      (p) => selectedIds.has(p.id) && !scoped.some((s) => s.id === p.id),
+    );
+    return missing.length ? [...scoped, ...missing] : scoped;
+  }, [direction, products, partnerCompanyId, lines]);
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -288,7 +575,6 @@ export default function PurchaseOrderBoard() {
     const latest = orders.find((o) => o.id === detailOrder.id);
     if (latest) {
       setDetailOrder(latest);
-      setDetailStatus(latest.status);
     }
   }, [orders, detailOrder?.id]);
 
@@ -385,17 +671,50 @@ export default function PurchaseOrderBoard() {
 
   function chooseDirection(next: OrderDirection) {
     if (next === direction) return;
-    const list = next === "Sale" ? buyers : vendors;
+    // Editing an existing order must keep saved lines/partner — not create defaults.
+    if (editingDraft) return;
     setDirection(next);
-    setPartnerCompanyId(list[0]?.id ?? "");
+    setOrderNumber((current) => withDirectionPrefix(current, next));
+    setPartnerCompanyId("");
     setLines([emptyLine()]);
+  }
+
+  function fillOrderForm(order: PurchaseOrder) {
+    const nextDirection = order.direction === "Sale" ? "Sale" : "Purchase";
+    const partnerId =
+      order.partnerCompanyId ||
+      (nextDirection === "Sale" ? order.buyerCompanyId : order.supplierCompanyId) ||
+      "";
+    const items = order.orderItems ?? [];
+
+    setEditingDraft(order);
+    setOrderNumber(order.orderNumber);
+    setDirection(nextDirection);
+    setPartnerCompanyId(partnerId);
+    setDeliveryDate(order.deliveryDate ? toDateInputValue(new Date(order.deliveryDate)) : "");
+    setPaymentTerms(order.paymentTerms ?? "Net30");
+    setTaxRate(String(Number(order.taxRate || 0)));
+    setNotes(order.notes ?? "");
+    setLines(
+      items.length > 0
+        ? items.map((item) => ({
+            productId: item.productId,
+            quantity: String(item.quantity),
+            unitPrice: String(Number(item.unitPrice)),
+            discount: String(Number(item.discountAmount || 0)),
+            discountTouched: true,
+          }))
+        : [emptyLine()],
+    );
+    setFormError(null);
+    setModalOpen(true);
   }
 
   function openCreate() {
     setEditingDraft(null);
-    setOrderNumber(nextPoNumber());
     setDirection("Purchase");
-    setPartnerCompanyId(vendors[0]?.id ?? "");
+    setOrderNumber(nextOrderNumber("Purchase"));
+    setPartnerCompanyId("");
     setDeliveryDate(toDateInputValue(new Date(Date.now() + 14 * 86400000)));
     setPaymentTerms("Net30");
     setTaxRate("0");
@@ -412,44 +731,36 @@ export default function PurchaseOrderBoard() {
     setFormError(null);
   }
 
-  function openEditDraft(order: PurchaseOrder) {
+  async function openEditDraft(order: PurchaseOrder) {
     if (!canEdit || !canEditOrderDetails(order.status)) return;
     setMenuOpenId(null);
-    setEditingDraft(order);
-    const nextDirection = order.direction === "Sale" ? "Sale" : "Purchase";
-    setOrderNumber(order.orderNumber);
-    setDirection(nextDirection);
-    setPartnerCompanyId(
-      order.partnerCompanyId ||
-        (nextDirection === "Sale" ? order.buyerCompanyId : order.supplierCompanyId) ||
-        "",
-    );
-    setDeliveryDate(order.deliveryDate ? toDateInputValue(new Date(order.deliveryDate)) : "");
-    setPaymentTerms(order.paymentTerms ?? "Net30");
-    setTaxRate(String(Number(order.taxRate || 0)));
-    setNotes(order.notes ?? "");
-    setLines(
-      order.orderItems.length
-        ? order.orderItems.map((item) => ({
-            productId: item.productId,
-            quantity: String(item.quantity),
-            unitPrice: String(Number(item.unitPrice)),
-            discount: String(Number(item.discountAmount || 0)),
-            discountTouched: true,
-          }))
-        : [emptyLine()],
-    );
     setFormError(null);
-    setModalOpen(true);
+    // Prefill from the card immediately, then refresh from API so rejected
+    // resubmits always show saved values (not empty create defaults).
+    fillOrderForm(order);
+    try {
+      const fresh = await getOrder(order.id);
+      setOrders((rows) => rows.map((row) => (row.id === fresh.id ? fresh : row)));
+      if (detailOrder?.id === fresh.id) {
+        setDetailOrder(fresh);
+      }
+      fillOrderForm(fresh);
+    } catch (err) {
+      setFormError(
+        err instanceof ApiError
+          ? err.message
+          : "Could not load the latest order details.",
+      );
+    }
   }
 
   async function submitOrder(status: "Draft" | "Pending") {
     if (!canEdit) {
-      setFormError("You have view-only access to purchase orders.");
+      setFormError("You have view-only access to orders.");
       return;
     }
     if (!orderNumber.trim()) {
-      setFormError("PO number is required.");
+      setFormError(`${orderNumberLabel(direction)} is required.`);
       return;
     }
     if (!partnerCompanyId) {
@@ -520,6 +831,28 @@ export default function PurchaseOrderBoard() {
       return;
     }
 
+    if (
+      editingDraft?.status === "Rejected" &&
+      rejectedResubmitUnchanged(editingDraft, {
+        orderNumber,
+        direction,
+        partnerCompanyId,
+        deliveryDate,
+        paymentTerms,
+        taxRate,
+        notes,
+        lines: orderItems.map((item) => ({
+          productId: item.productId,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          discount: item.discountAmount,
+        })),
+      })
+    ) {
+      setFormError("Change at least one field before resubmitting.");
+      return;
+    }
+
     setSaving(true);
     setFormError(null);
     try {
@@ -548,8 +881,8 @@ export default function PurchaseOrderBoard() {
         err instanceof ApiError
           ? err.message
           : editingDraft
-            ? "Could not update purchase order."
-            : "Could not create purchase order.",
+            ? `Could not update ${orderKindLabel(direction).toLowerCase()}.`
+            : `Could not create ${orderKindLabel(direction).toLowerCase()}.`,
       );
     } finally {
       setSaving(false);
@@ -565,11 +898,13 @@ export default function PurchaseOrderBoard() {
     const current = orders.find((o) => o.id === orderId);
     if (!current || current.status === status) return;
     if (!canEdit) {
-      setError("You have view-only access to purchase orders.");
+      setError("You have view-only access to orders.");
       return;
     }
     if (!canTransitionOrder(current.status, status)) {
-      setError(`Cannot change purchase order status from ${current.status} to ${status}.`);
+      setError(
+        `Cannot change ${orderKindLabel(current.direction).toLowerCase()} status from ${current.status} to ${status}.`,
+      );
       return;
     }
     if (status === "Approved" && !canApproveOrder(current, currentUserId, admin)) {
@@ -580,9 +915,6 @@ export default function PurchaseOrderBoard() {
       setRejectTarget(current);
       setRejectReason("");
       setRejectError(null);
-      if (detailOrder?.id === current.id) {
-        setDetailStatus(current.status);
-      }
       return;
     }
 
@@ -598,7 +930,6 @@ export default function PurchaseOrderBoard() {
       setOrders((rows) => rows.map((row) => (row.id === orderId ? updated : row)));
       if (detailOrder?.id === orderId) {
         setDetailOrder(updated);
-        setDetailStatus(updated.status);
       }
     } catch (err) {
       setOrders(previous);
@@ -623,12 +954,15 @@ export default function PurchaseOrderBoard() {
       setOrders((rows) => rows.map((row) => (row.id === updated.id ? updated : row)));
       if (detailOrder?.id === updated.id) {
         setDetailOrder(updated);
-        setDetailStatus(updated.status);
       }
       setRejectTarget(null);
       setRejectReason("");
     } catch (err) {
-      setRejectError(err instanceof ApiError ? err.message : "Could not reject purchase order.");
+      setRejectError(
+        err instanceof ApiError
+          ? err.message
+          : `Could not reject ${orderKindLabel(rejectTarget.direction).toLowerCase()}.`,
+      );
     } finally {
       setRejectSaving(false);
     }
@@ -665,7 +999,6 @@ export default function PurchaseOrderBoard() {
   function openDetails(order: PurchaseOrder) {
     setMenuOpenId(null);
     setDetailOrder(order);
-    setDetailStatus(order.status);
   }
 
   function closeDetails() {
@@ -673,15 +1006,25 @@ export default function PurchaseOrderBoard() {
     setDetailOrder(null);
   }
 
-  async function saveDetailStatus() {
+  async function applyDetailStatus(status: OrderStatus) {
     if (!detailOrder || !canEdit) return;
-    if (detailStatus === detailOrder.status) return;
     setActionBusy(true);
     try {
-      await moveOrder(detailOrder.id, detailStatus);
+      await moveOrder(detailOrder.id, status);
     } finally {
       setActionBusy(false);
     }
+  }
+
+  function detailStatusActions(order: PurchaseOrder) {
+    const next = nextOrderStatuses(order.status);
+    const canApprove = canApproveOrder(order, currentUserId, admin);
+    return next.filter((status) => {
+      if (status === "Approved" || (status === "Rejected" && order.status === "Pending")) {
+        return canApprove;
+      }
+      return true;
+    });
   }
 
   async function onGenerateInvoice(order: PurchaseOrder) {
@@ -706,7 +1049,7 @@ export default function PurchaseOrderBoard() {
 
   function onExport() {
     const stamp = new Date().toISOString().slice(0, 10);
-    exportOrdersExcel(filtered, `purchase-orders-${stamp}.xlsx`);
+    exportOrdersExcel(filtered, `orders-${stamp}.xlsx`);
   }
 
   const detailSubtotal = useMemo(() => {
@@ -714,11 +1057,16 @@ export default function PurchaseOrderBoard() {
     return detailOrder.orderItems.reduce((sum, item) => sum + Number(item.totalPrice || 0), 0);
   }, [detailOrder]);
 
+  const detailActions = useMemo(
+    () => (detailOrder ? detailStatusActions(detailOrder) : []),
+    [detailOrder, currentUserId, admin],
+  );
+
   return (
     <div className="animate-rise">
       <AdminPageHeader
-        title="Purchase orders"
-        description="Track procurement flow — board view or table."
+        title="Orders"
+        description="Track purchase orders and sales orders — board view or table."
         action={
           <div className="flex flex-wrap items-center gap-2">
             {canEdit ? (
@@ -727,7 +1075,7 @@ export default function PurchaseOrderBoard() {
                 onClick={openCreate}
                 className="rounded-full bg-[#051A2D] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#0a3050]"
               >
-                Add PO
+                Add order
               </button>
             ) : null}
             <div className="flex rounded-full bg-white p-1 ring-1 ring-black/[0.06]">
@@ -775,7 +1123,7 @@ export default function PurchaseOrderBoard() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by PO number, buyer, or vendor…"
+            placeholder="Search by order number, buyer, or vendor…"
             className="w-full rounded-2xl border border-black/[0.06] bg-white px-4 py-2.5 text-sm font-medium text-[#0B1220] outline-none ring-[#051A2D]/30 placeholder:text-[#8B95A5] focus:ring-2"
           />
         </label>
@@ -817,7 +1165,7 @@ export default function PurchaseOrderBoard() {
 
       {loading ? (
         <div className="rounded-[24px] border border-black/[0.04] bg-white px-5 py-12 text-center text-sm text-[#8B95A5]">
-          Loading purchase orders…
+          Loading orders…
         </div>
       ) : view === "kanban" ? (
         <div className="flex gap-3 overflow-x-auto pb-2">
@@ -854,6 +1202,8 @@ export default function PurchaseOrderBoard() {
                   ) : (
                     cards.map((order) => {
                       const canInvoice = canEdit && canEditInvoices && canInvoiceOrder(order);
+                      const canApprove =
+                        canEdit && canApproveOrder(order, currentUserId, admin);
                       const payLabel = paymentLabel(order.paymentStatus);
                       return (
                         <article
@@ -873,9 +1223,8 @@ export default function PurchaseOrderBoard() {
                                 {order.orderNumber}
                               </p>
                               <p className="mt-1 text-xs font-medium text-[#8B95A5]">
-                                {order.direction === "Sale" ? "Sale" : "Purchase"} ·{" "}
-                                {order.supplierCompanyName || "Vendor"} →{" "}
-                                {order.buyerCompanyName || "Buyer"}
+                                {orderDirectionLabel(order.direction)} ·{" "}
+                                {orderPartiesLine(order)}
                               </p>
                             </div>
                             <div className="relative shrink-0" data-po-actions>
@@ -896,7 +1245,7 @@ export default function PurchaseOrderBoard() {
                                 ···
                               </button>
                               {menuOpenId === order.id ? (
-                                <div className="absolute right-0 top-8 z-30 min-w-[180px] rounded-2xl border border-black/[0.06] bg-white p-1.5 shadow-xl">
+                                <div className="absolute right-0 top-8 z-30 min-w-[180px] rounded-2xl border border-black/[0.06] bg-white p-1.5 shadow-lg ring-1 ring-black/5">
                                   <button
                                     type="button"
                                     onClick={() => openDetails(order)}
@@ -939,22 +1288,17 @@ export default function PurchaseOrderBoard() {
                             </div>
                           </div>
 
-                          <div className="mt-3 flex items-center justify-between gap-2">
-                            <span className="text-sm font-bold text-[#051A2D]">
+                          <div className="mt-2.5 flex items-center justify-between gap-2">
+                            <span
+                              dir="ltr"
+                              className="text-sm font-semibold tabular-nums text-[#051A2D]"
+                            >
                               {formatMoney(Number(order.totalAmount))}
                             </span>
                             <span className="text-[11px] font-medium text-[#8B95A5]">
                               {formatOrderDate(order.orderDate)}
                             </span>
                           </div>
-                          <p className="mt-1 text-[11px] font-medium text-[#8B95A5]">
-                            Discount {formatMoney(orderDiscount(order))}
-                          </p>
-                          {order.status === "Pending" && orderNeedsAdminApproval(order) ? (
-                            <p className="mt-1.5 text-[11px] font-semibold text-amber-700">
-                              Organization admin must approve this order.
-                            </p>
-                          ) : null}
 
                           {order.rejectionReason ? (
                             <p
@@ -970,9 +1314,9 @@ export default function PurchaseOrderBoard() {
                             </p>
                           ) : null}
 
-                          <div className="mt-2.5 flex items-center justify-between gap-2">
+                          <div className="mt-2.5 flex flex-nowrap items-center gap-1.5">
                             <span
-                              className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold ${paymentTone(order.paymentStatus)}`}
+                              className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${paymentTone(order.paymentStatus)}`}
                               title={`Payment: ${payLabel}`}
                             >
                               <span
@@ -981,8 +1325,40 @@ export default function PurchaseOrderBoard() {
                               />
                               {payLabel}
                             </span>
+                            {canApprove && order.status === "Pending" ? (
+                              <>
+                                <button
+                                  type="button"
+                                  disabled={busyId === order.id}
+                                  draggable={false}
+                                  onMouseDown={(e) => e.stopPropagation()}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    void moveOrder(order.id, "Approved");
+                                  }}
+                                  className="shrink-0 rounded-full bg-[#051A2D] px-2 py-0.5 text-[10px] font-bold text-white hover:bg-[#0a3050] disabled:opacity-50"
+                                >
+                                  Approve
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={busyId === order.id}
+                                  draggable={false}
+                                  onMouseDown={(e) => e.stopPropagation()}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setRejectTarget(order);
+                                    setRejectReason("");
+                                    setRejectError(null);
+                                  }}
+                                  className="shrink-0 rounded-full border border-red-200 bg-white px-2 py-0.5 text-[10px] font-bold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                                >
+                                  Reject
+                                </button>
+                              </>
+                            ) : null}
                             {order.orderItems?.length ? (
-                              <span className="text-[11px] font-medium text-[#8B95A5]">
+                              <span className="ml-auto shrink-0 text-[11px] font-medium text-[#8B95A5]">
                                 {order.orderItems.length} line
                                 {order.orderItems.length === 1 ? "" : "s"}
                               </span>
@@ -1003,12 +1379,12 @@ export default function PurchaseOrderBoard() {
             <table className="min-w-full text-left text-sm">
               <thead className="bg-[#F8FAFB] text-xs font-semibold tracking-wide text-[#8B95A5]">
                 <tr>
-                  <th className="px-5 py-3.5">PO number</th>
+                  <th className="px-5 py-3.5">Order number</th>
                   <th className="px-5 py-3.5">Buyer</th>
                   <th className="px-5 py-3.5">Vendor</th>
                   <th className="px-5 py-3.5">Date</th>
-                  <th className="px-5 py-3.5">Amount</th>
-                  <th className="px-5 py-3.5">Discount</th>
+                  <th className="px-5 py-3.5 text-right">Amount</th>
+                  <th className="px-5 py-3.5 text-right">Discount</th>
                   <th className="px-5 py-3.5">Status</th>
                   <th className="px-5 py-3.5">Payment</th>
                   <th className="px-5 py-3.5 text-right">Actions</th>
@@ -1018,7 +1394,7 @@ export default function PurchaseOrderBoard() {
                 {filtered.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="px-5 py-12 text-center text-[#8B95A5]">
-                      No purchase orders found.
+                      No orders found.
                     </td>
                   </tr>
                 ) : (
@@ -1027,7 +1403,7 @@ export default function PurchaseOrderBoard() {
                     return (
                       <tr
                         key={order.id}
-                        className="border-t border-black/[0.04] transition hover:bg-[#F8FAFB]"
+                        className="border-t border-transparent transition hover:bg-[#F8FAFB]"
                       >
                         <td className="px-5 py-3.5 font-semibold text-[#0B1220]">
                           {order.orderNumber}
@@ -1041,10 +1417,10 @@ export default function PurchaseOrderBoard() {
                         <td className="px-5 py-3.5 text-[#4B5563]">
                           {formatOrderDate(order.orderDate)}
                         </td>
-                        <td className="px-5 py-3.5 font-semibold text-[#0B1220]">
+                        <td className="px-5 py-3.5 text-right font-semibold tabular-nums text-[#0B1220]">
                           {formatMoney(Number(order.totalAmount))}
                         </td>
-                        <td className="px-5 py-3.5 font-medium text-[#4B5563]">
+                        <td className="px-5 py-3.5 text-right font-medium tabular-nums text-[#4B5563]">
                           {formatMoney(orderDiscount(order))}
                         </td>
                         <td className="px-5 py-3.5">
@@ -1075,7 +1451,7 @@ export default function PurchaseOrderBoard() {
                               ···
                             </button>
                             {menuOpenId === order.id ? (
-                              <div className="absolute right-5 top-12 z-20 min-w-[200px] rounded-2xl border border-black/[0.06] bg-white p-1.5 shadow-xl">
+                              <div className="absolute right-5 top-12 z-20 min-w-[200px] rounded-2xl border border-black/[0.06] bg-white p-1.5 shadow-lg ring-1 ring-black/5">
                                 <button
                                   type="button"
                                   onClick={() => openDetails(order)}
@@ -1140,14 +1516,14 @@ export default function PurchaseOrderBoard() {
               <div>
                 <h2 className="text-xl font-bold text-[#0B1220]">
                   {editingDraft?.status === "Rejected"
-                    ? "Edit rejected purchase order"
+                    ? `Edit rejected ${orderKindLabel(direction).toLowerCase()}`
                     : editingDraft
-                      ? "Edit draft purchase order"
-                      : "Add purchase order"}
+                      ? `Edit draft ${orderKindLabel(direction).toLowerCase()}`
+                      : `Add ${orderKindLabel(direction).toLowerCase()}`}
                 </h2>
                 <p className="mt-1 text-sm font-medium text-[#8B95A5]">
                   {editingDraft?.status === "Rejected"
-                    ? "Fix the order, then save to resubmit it for approval."
+                    ? "Change at least one field, then save to resubmit for approval."
                     : direction === "Purchase"
                       ? "Your organization is the buyer. Pick a vendor, then add its products."
                       : "Your organization is the seller. Pick a client, then add products."}
@@ -1170,7 +1546,7 @@ export default function PurchaseOrderBoard() {
 
             <form noValidate onSubmit={onCreateForm} className="space-y-5">
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="PO number *" className="sm:col-span-2">
+                <Field label={`${orderNumberLabel(direction)} *`} className="sm:col-span-2">
                   <input
                     value={orderNumber}
                     onChange={(e) => setOrderNumber(e.target.value)}
@@ -1187,8 +1563,9 @@ export default function PurchaseOrderBoard() {
                     <button
                       key={value}
                       type="button"
+                      disabled={!!editingDraft}
                       onClick={() => chooseDirection(value)}
-                      className={`flex-1 rounded-full px-4 py-2 text-sm font-bold transition ${
+                      className={`flex-1 rounded-full px-4 py-2 text-sm font-bold transition disabled:cursor-not-allowed ${
                         direction === value
                           ? "bg-[#051A2D] text-white"
                           : "text-[#4B5563] hover:text-[#0B1220]"
@@ -1312,18 +1689,18 @@ export default function PurchaseOrderBoard() {
                         <thead className="bg-[#F8FAFB] text-xs font-semibold tracking-wide text-[#8B95A5]">
                           <tr>
                             <th className="px-3 py-2.5">Product</th>
-                            <th className="px-3 py-2.5 w-24">Qty</th>
-                            <th className="px-3 py-2.5 w-32">Unit price</th>
-                            <th className="px-3 py-2.5 w-28">Discount</th>
-                            <th className="px-3 py-2.5 w-28 text-right">Total</th>
-                            <th className="px-3 py-2.5 w-16" />
+                            <th className="w-24 px-3 py-2.5 text-right">Qty</th>
+                            <th className="w-32 px-3 py-2.5 text-right">Unit price</th>
+                            <th className="w-28 px-3 py-2.5 text-right">Discount</th>
+                            <th className="w-28 px-3 py-2.5 text-right">Total</th>
+                            <th className="w-16 px-3 py-2.5" />
                           </tr>
                         </thead>
                         <tbody>
                           {lines.map((line, index) => {
                             const amounts = lineAmounts(line);
                             return (
-                              <tr key={index} className="border-t border-black/[0.04]">
+                              <tr key={index} className="border-t border-transparent">
                                 <td className="px-3 py-2">
                                   <select
                                     value={line.productId}
@@ -1364,7 +1741,7 @@ export default function PurchaseOrderBoard() {
                                         "recalculate",
                                       )
                                     }
-                                    className={fieldClass}
+                                    className={`${fieldClass} text-right tabular-nums`}
                                     placeholder="Qty"
                                   />
                                 </td>
@@ -1379,7 +1756,7 @@ export default function PurchaseOrderBoard() {
                                         "recalculate",
                                       )
                                     }
-                                    className={fieldClass}
+                                    className={`${fieldClass} text-right tabular-nums`}
                                     placeholder="0.00"
                                   />
                                 </td>
@@ -1394,11 +1771,14 @@ export default function PurchaseOrderBoard() {
                                         "edit-discount",
                                       )
                                     }
-                                    className={fieldClass}
+                                    className={`${fieldClass} text-right tabular-nums`}
                                     placeholder="0.00"
                                   />
                                 </td>
-                                <td className="px-3 py-2 text-right font-semibold text-[#0B1220]">
+                                <td
+                                  dir="ltr"
+                                  className="px-3 py-2 text-right font-semibold tabular-nums text-[#0B1220]"
+                                >
                                   {formatMoney(amounts.total)}
                                 </td>
                                 <td className="px-3 py-2 text-right">
@@ -1502,9 +1882,8 @@ export default function PurchaseOrderBoard() {
                   {detailOrder.orderNumber}
                 </h2>
                 <p className="mt-1 text-sm font-medium text-[#8B95A5]">
-                  {detailOrder.direction === "Sale" ? "Sale" : "Purchase"} ·{" "}
-                  {detailOrder.supplierCompanyName || "Vendor"} →{" "}
-                  {detailOrder.buyerCompanyName || "Buyer"} ·{" "}
+                  {orderDirectionLabel(detailOrder.direction)} ·{" "}
+                  {orderPartiesLine(detailOrder)} ·{" "}
                   {formatOrderDate(detailOrder.orderDate)}
                 </p>
                 <p className="mt-1 text-sm font-medium text-[#8B95A5]">
@@ -1585,54 +1964,46 @@ export default function PurchaseOrderBoard() {
               </p>
             ) : null}
 
-            {detailOrder.status === "Pending" && orderNeedsAdminApproval(detailOrder) ? (
-              <p className="mb-4 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
-                This order is above the {formatMoney(Number(detailOrder.approvalThreshold || 0))}{" "}
-                approval threshold. An organization admin must approve it.
-              </p>
-            ) : null}
-
-            {canEdit && detailOrder.status === "Pending" ? (
+            {canEdit && detailActions.length === 0 && detailOrder.status === "Pending" ? (
               <p className="mb-4 text-sm font-medium text-[#8B95A5]">
-                Reject this order to allow edits. Cancel voids it.
+                Waiting for approval.
               </p>
             ) : null}
 
-            {canEdit ? (
-              <div className="mb-5 flex flex-wrap items-end gap-3 rounded-2xl border border-black/[0.04] bg-[#F8FAFB] p-4">
-                <label className="min-w-[160px] flex-1">
-                  <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-[#8B95A5]">
-                    Status
-                  </span>
-                  <select
-                    value={detailStatus}
-                    onChange={(e) => setDetailStatus(e.target.value as OrderStatus)}
-                    className={fieldClass}
-                  >
-                    {ORDER_STATUSES.filter((status) => {
-                      if (!canTransitionOrder(detailOrder.status, status)) return false;
-                      if (
-                        status === "Approved" &&
-                        !canApproveOrder(detailOrder, currentUserId, admin)
-                      ) {
-                        return false;
-                      }
-                      return true;
-                    }).map((status) => (
-                      <option key={status} value={status}>
-                        {status === "Rejected" ? "Rejected" : status}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <button
-                  type="button"
-                  disabled={actionBusy || detailStatus === detailOrder.status}
-                  onClick={() => void saveDetailStatus()}
-                  className="rounded-full bg-[#051A2D] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#0a3050] disabled:opacity-50"
-                >
-                  {actionBusy ? "Saving…" : "Update status"}
-                </button>
+            {canEdit && detailActions.length > 0 ? (
+              <div className="mb-5 rounded-2xl border border-black/[0.04] bg-[#F8FAFB] px-3 py-3">
+                <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[#8B95A5]">
+                  Status
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {detailActions.map((status) => {
+                    const label = statusActionLabel(detailOrder.status, status);
+                    const destructive =
+                      status === "Rejected" || status === "Cancelled";
+                    const primary =
+                      status === "Approved" ||
+                      status === "Pending" ||
+                      status === "Shipped" ||
+                      status === "Delivered";
+                    return (
+                      <button
+                        key={status}
+                        type="button"
+                        disabled={actionBusy}
+                        onClick={() => void applyDetailStatus(status)}
+                        className={
+                          destructive
+                            ? "rounded-full border border-red-200 bg-white px-2.5 py-1 text-[11px] font-bold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                            : primary
+                              ? "rounded-full bg-[#051A2D] px-2.5 py-1 text-[11px] font-bold text-white hover:bg-[#0a3050] disabled:opacity-50"
+                              : "rounded-full border border-black/[0.08] bg-white px-2.5 py-1 text-[11px] font-bold text-[#051A2D] hover:bg-[#F8FAFB] disabled:opacity-50"
+                        }
+                      >
+                        {actionBusy ? "Saving…" : label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             ) : null}
 
@@ -1657,23 +2028,32 @@ export default function PurchaseOrderBoard() {
                     </tr>
                   ) : (
                     detailOrder.orderItems.map((item) => (
-                      <tr key={item.id} className="border-t border-black/[0.04]">
+                      <tr key={item.id} className="border-t border-transparent">
                         <td className="px-4 py-3 font-semibold text-[#0B1220]">
                           {item.productName || "Product"}
                         </td>
                         <td className="px-4 py-3 text-[#4B5563]">
                           {item.productSku || "—"}
                         </td>
-                        <td className="px-4 py-3 text-right text-[#4B5563]">
+                        <td className="px-4 py-3 text-right tabular-nums text-[#4B5563]">
                           {item.quantity}
                         </td>
-                        <td className="px-4 py-3 text-right text-[#4B5563]">
+                        <td
+                          dir="ltr"
+                          className="px-4 py-3 text-right tabular-nums text-[#4B5563]"
+                        >
                           {formatMoney(Number(item.unitPrice))}
                         </td>
-                        <td className="px-4 py-3 text-right text-[#4B5563]">
+                        <td
+                          dir="ltr"
+                          className="px-4 py-3 text-right tabular-nums text-[#4B5563]"
+                        >
                           {formatMoney(Number(item.discountAmount || 0))}
                         </td>
-                        <td className="px-4 py-3 text-right font-semibold text-[#0B1220]">
+                        <td
+                          dir="ltr"
+                          className="px-4 py-3 text-right font-semibold tabular-nums text-[#0B1220]"
+                        >
                           {formatMoney(Number(item.totalPrice))}
                         </td>
                       </tr>
@@ -1718,43 +2098,51 @@ export default function PurchaseOrderBoard() {
             </div>
 
             <div className="mt-6">
-              <h3 className="text-sm font-bold text-[#0B1220]">Field changes</h3>
+              <h3 className="text-sm font-semibold text-[#0B1220]">History</h3>
+              {!canSeeFinancialHistory ? (
+                <p className="mt-1 text-xs font-medium text-[#8B95A5]">
+                  Status and creation only. Financial change audit is limited to
+                  organization admins and Finance.
+                </p>
+              ) : null}
               {historyLoading ? (
-                <p className="mt-2 text-sm font-medium text-[#8B95A5]">
-                  Loading field changes…
-                </p>
+                <p className="mt-2 text-sm text-[#8B95A5]">Loading history…</p>
               ) : fieldHistory.length === 0 ? (
-                <p className="mt-2 text-sm font-medium text-[#8B95A5]">
-                  No field changes are recorded yet.
-                </p>
+                <p className="mt-2 text-sm text-[#8B95A5]">No history recorded yet.</p>
               ) : (
-                <div className="mt-3 space-y-3">
-                  {groupFieldHistory(fieldHistory).map((group) => (
-                    <div
-                      key={group.id}
-                      className="rounded-2xl border border-black/[0.06] px-3.5 py-3"
-                    >
-                      <p className="text-sm font-semibold text-[#0B1220]">
-                        {formatOrderDateTime(group.createdAt)}
-                        <span className="font-medium text-[#8B95A5]">
-                          {" "}
-                          · {group.actorName || "User"}
-                        </span>
-                      </p>
-                      <ul className="mt-2 space-y-1.5">
-                        {group.changes.map((change) => (
-                          <li key={change.id} className="text-sm text-[#4B5563]">
-                            <span className="font-medium text-[#0B1220]">
-                              {change.field}:{" "}
-                            </span>
-                            {historyValue(change.oldValue)}
-                            <span className="mx-1.5 text-[#8B95A5]">→</span>
-                            {historyValue(change.newValue)}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
+                <div className="mt-3 space-y-2">
+                  {groupFieldHistory(fieldHistory).map((group) => {
+                    const lines = compactHistoryChanges(
+                      group.changes,
+                      detailOrder.direction,
+                    );
+                    if (lines.length === 0) return null;
+                    return (
+                      <div
+                        key={group.id}
+                        className="rounded-2xl border border-black/[0.06] px-3.5 py-3"
+                      >
+                        <p className="text-sm font-semibold text-[#0B1220]">
+                          {formatOrderDateTime(group.createdAt)}
+                          <span className="font-medium text-[#8B95A5]">
+                            {" "}
+                            · {group.actorName || "User"}
+                          </span>
+                        </p>
+                        <ul className="mt-1.5 space-y-1">
+                          {lines.map((line) => (
+                            <li
+                              key={line.id}
+                              dir="ltr"
+                              className="text-sm tabular-nums text-[#4B5563]"
+                            >
+                              {line.text}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -1776,10 +2164,11 @@ export default function PurchaseOrderBoard() {
             }}
           />
           <div className="relative z-10 w-full max-w-md rounded-[28px] bg-white p-6 shadow-2xl sm:p-7">
-            <h2 className="text-xl font-bold text-[#0B1220]">Reject purchase order</h2>
+            <h2 className="text-xl font-bold text-[#0B1220]">
+              Reject {orderKindLabel(rejectTarget.direction).toLowerCase()}
+            </h2>
             <p className="mt-1 text-sm font-medium text-[#8B95A5]">
-              {rejectTarget.orderNumber} will move to Reject. The buyer can edit and resubmit
-              it.
+              {rejectTarget.orderNumber} will move to Reject. It can be edited and resubmitted.
             </p>
             <label className="mt-5 block">
               <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-[#8B95A5]">

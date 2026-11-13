@@ -1,4 +1,4 @@
-import { apiFetch } from "@/lib/api";
+import { apiFetch, newIdempotencyKey } from "@/lib/api";
 
 export type InvoiceStatus = "Paid" | "Unpaid" | "PartiallyPaid" | "Overdue";
 
@@ -43,10 +43,11 @@ export function listInvoices() {
   return apiFetch<Invoice[]>("/api/Invoices");
 }
 
-export function createInvoice(payload: CreateInvoicePayload) {
+export function createInvoice(payload: CreateInvoicePayload, idempotencyKey?: string) {
   return apiFetch<Invoice>("/api/Invoices", {
     method: "POST",
     body: JSON.stringify(payload),
+    headers: { "Idempotency-Key": idempotencyKey ?? newIdempotencyKey() },
   });
 }
 
@@ -61,10 +62,11 @@ export function deleteInvoice(id: string) {
   return apiFetch<void>(`/api/Invoices/${id}`, { method: "DELETE" });
 }
 
-export function recordPayment(id: string, amount: number) {
+export function recordPayment(id: string, amount: number, idempotencyKey?: string) {
   return apiFetch<Invoice>(`/api/Invoices/${id}/payments`, {
     method: "POST",
     body: JSON.stringify({ amount }),
+    headers: { "Idempotency-Key": idempotencyKey ?? newIdempotencyKey() },
   });
 }
 

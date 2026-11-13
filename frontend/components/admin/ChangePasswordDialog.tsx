@@ -1,7 +1,9 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ApiError } from "@/lib/api";
+import { clearSession } from "@/lib/auth";
 import { changeOwnPassword } from "@/lib/employees";
 
 const fieldClass =
@@ -14,6 +16,7 @@ export default function ChangePasswordDialog({
   open: boolean;
   onClose: () => void;
 }) {
+  const router = useRouter();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -81,15 +84,19 @@ export default function ChangePasswordDialog({
         {done ? (
           <div className="mt-5 space-y-4">
             <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
-              Password updated for this organization. Other organizations keep their own passwords.
+              Password updated. Your session was ended for security — sign in again with the new
+              password.
             </p>
             <div className="flex justify-end">
               <button
                 type="button"
-                onClick={close}
+                onClick={() => {
+                  clearSession();
+                  router.replace("/login");
+                }}
                 className="rounded-full bg-[#051A2D] px-5 py-2.5 text-sm font-bold text-white"
               >
-                Done
+                Sign in again
               </button>
             </div>
           </div>

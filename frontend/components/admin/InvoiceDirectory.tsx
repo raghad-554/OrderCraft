@@ -224,7 +224,7 @@ export default function InvoiceDirectory() {
       return;
     }
     if (!editing && !form.orderId) {
-      setFormError("Purchase order is required.");
+      setFormError("Order is required.");
       return;
     }
     if (!form.invoiceNumber.trim()) {
@@ -333,7 +333,7 @@ export default function InvoiceDirectory() {
     <div className="animate-rise">
       <AdminPageHeader
         title="Invoices"
-        description="Billing records linked to purchase orders — track amounts and payment status."
+        description="Billing records linked to orders — track amounts and payment status."
         action={
           canEdit ? (
             <button
@@ -359,7 +359,7 @@ export default function InvoiceDirectory() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by invoice #, PO, buyer, or vendor…"
+            placeholder="Search by invoice #, order, buyer, or vendor…"
             className="w-full rounded-2xl border border-black/[0.06] bg-white px-4 py-2.5 text-sm font-medium text-[#0B1220] outline-none ring-[#051A2D]/30 placeholder:text-[#8B95A5] focus:ring-2"
           />
         </label>
@@ -399,7 +399,7 @@ export default function InvoiceDirectory() {
             <thead className="bg-[#F8FAFB] text-xs font-semibold tracking-wide text-[#8B95A5]">
               <tr>
                 <th className="px-5 py-3.5">Invoice #</th>
-                <th className="px-5 py-3.5">PO</th>
+                <th className="px-5 py-3.5">Order</th>
                 <th className="px-5 py-3.5">Buyer</th>
                 <th className="px-5 py-3.5">Vendor</th>
                 <th className="px-5 py-3.5">Amount</th>
@@ -569,7 +569,7 @@ export default function InvoiceDirectory() {
                 <p className="mt-1 text-sm font-medium text-[#8B95A5]">
                   {editing
                     ? "Update the invoice number, amount, or due date. Payment status follows recorded payments."
-                    : "Create a billing record from an Approved (or later) purchase order."}
+                    : "Create a billing record from an Approved (or later) order."}
                 </p>
               </div>
               <button
@@ -583,10 +583,10 @@ export default function InvoiceDirectory() {
 
             <form noValidate onSubmit={(e) => void onSubmit(e)} className="space-y-4">
               {!editing ? (
-                <Field label="Purchase order *">
+                <Field label="Order *">
                   {invoiceableOrders.length === 0 ? (
                     <p className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm font-medium text-amber-800">
-                      No eligible POs. Approve an order that still has an amount left to
+                      No eligible orders. Approve an order that still has an amount left to
                       invoice.
                     </p>
                   ) : (
@@ -596,7 +596,7 @@ export default function InvoiceDirectory() {
                       className={fieldClass}
                       disabled={!canEdit}
                     >
-                      <option value="">Select PO</option>
+                      <option value="">Select order</option>
                       {invoiceableOrders.map((order) => (
                         <option key={order.id} value={order.id}>
                           {order.orderNumber} · remaining{" "}
@@ -607,7 +607,7 @@ export default function InvoiceDirectory() {
                   )}
                 </Field>
               ) : (
-                <Field label="Purchase order">
+                <Field label="Order">
                   <input
                     value={editing.orderNumber || editing.orderId}
                     className={fieldClass}

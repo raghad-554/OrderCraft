@@ -13,7 +13,14 @@ import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import { ApiError } from "@/lib/api";
 import { getSession, isAdmin } from "@/lib/auth";
 import { listCompanies, type Company } from "@/lib/companies";
-import { addExistingMember } from "@/lib/organizations";
+import {
+  addExistingMember,
+  createInvitation,
+  inviteAcceptPath,
+  listInvitations,
+  revokeInvitation,
+  type OrganizationInvitation,
+} from "@/lib/organizations";
 import DepartmentEditorDialog from "@/components/admin/DepartmentEditorDialog";
 import {
   type Employee,
@@ -157,6 +164,12 @@ export default function EmployeeDirectory() {
   const [existingDepartmentId, setExistingDepartmentId] = useState("");
   const [departmentEditorOpen, setDepartmentEditorOpen] = useState(false);
   const [existingBusy, setExistingBusy] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteDepartmentId, setInviteDepartmentId] = useState("");
+  const [inviteIsAdmin, setInviteIsAdmin] = useState(false);
+  const [inviteBusy, setInviteBusy] = useState(false);
+  const [invitations, setInvitations] = useState<OrganizationInvitation[]>([]);
+  const [lastInviteLink, setLastInviteLink] = useState<string | null>(null);
   const [resetTarget, setResetTarget] = useState<Employee | null>(null);
   const [resetPassword, setResetPassword] = useState("");
   const [resetConfirm, setResetConfirm] = useState("");
@@ -172,28 +185,36 @@ export default function EmployeeDirectory() {
     setLoading(true);
     setError(null);
     try {
-      const [rows, companyRows, departmentRows, pages] = await Promise.all([
+      const [rows, companyRows, departmentRows, pages, inviteRows] = await Promise.all([
         listEmployees(debouncedSearch || undefined),
         listCompanies(),
         listOrganizationDepartments(true),
         listPermissionCatalog(),
+        canEdit ? listInvitations() : Promise.resolve([]),
       ]);
       setEmployees(asList(rows));
       setCompanies(asList(companyRows));
       setDepartments(asList(departmentRows));
       setPageCatalog(asList(pages));
+      setInvitations(asList(inviteRows));
       setExistingDepartmentId((current) => current || defaultDepartmentId(departmentRows));
+      setInviteDepartmentId((current) => current || defaultDepartmentId(departmentRows));
       setPage(1);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load employees.");
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch]);
+  }, [debouncedSearch, canEdit]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  const pendingInvites = useMemo(
+    () => invitations.filter((row) => row.status === "Pending"),
+    [invitations],
+  );
 
   const pageCount = Math.max(1, Math.ceil(employees.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
@@ -275,6 +296,57 @@ export default function EmployeeDirectory() {
       setError(err instanceof ApiError ? err.message : "Could not add that person to this organization.");
     } finally {
       setExistingBusy(false);
+    }
+  }
+
+  async function onInvite(event: FormEvent) {
+    event.preventDefault();
+    if (!canEdit) return;
+    const email = inviteEmail.trim();
+    if (!email || !inviteDepartmentId) {
+      setError("Enter an email and department for the invitation.");
+      return;
+    }
+    setInviteBusy(true);
+    setError(null);
+    setLastInviteLink(null);
+    try {
+      const created = await createInvitation(email, inviteDepartmentId, inviteIsAdmin);
+      setInviteEmail("");
+      setInviteIsAdmin(false);
+      if (created.acceptToken) {
+        const path = inviteAcceptPath(created.acceptToken);
+        const absolute =
+          typeof window !== "undefined" ? `${window.location.origin}${path}` : path;
+        setLastInviteLink(absolute);
+        try {
+          await navigator.clipboard.writeText(absolute);
+        } catch {
+          /* ignore clipboard failures */
+        }
+      }
+      setResetInfo(
+        created.acceptToken
+          ? "Invitation created. Share the link below (also copied when clipboard allows)."
+          : "Invitation created.",
+      );
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not create invitation.");
+    } finally {
+      setInviteBusy(false);
+    }
+  }
+
+  async function onRevokeInvite(invitation: OrganizationInvitation) {
+    if (!canEdit) return;
+    if (!window.confirm(`Revoke invitation for ${invitation.email}?`)) return;
+    setError(null);
+    try {
+      await revokeInvitation(invitation.id);
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not revoke invitation.");
     }
   }
 
@@ -409,47 +481,140 @@ export default function EmployeeDirectory() {
       </div>
 
       {canEdit ? (
-        <form
-          onSubmit={(e) => void onAddExisting(e)}
-          className="mb-4 flex flex-wrap items-end gap-2 rounded-[24px] border border-black/[0.04] bg-white p-4"
-        >
-          <label className="min-w-[220px] flex-1">
-            <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-[#8B95A5]">
-              Add existing member
-            </span>
-            <input
-              value={existingIdentifier}
-              onChange={(e) => setExistingIdentifier(e.target.value)}
-              placeholder="Username or email from the other organization"
-              className={fieldClass}
-            />
-          </label>
-          <label className="min-w-[180px]">
-            <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-[#8B95A5]">
-              Department
-            </span>
-            <select
-              value={existingDepartmentId}
-              onChange={(e) => setExistingDepartmentId(e.target.value)}
-              className={fieldClass}
-            >
-              {departments
-                .filter((department) => department.isActive)
-                .map((department) => (
-                  <option key={department.id} value={department.id}>
-                    {department.name}
-                  </option>
-                ))}
-            </select>
-          </label>
-          <button
-            type="submit"
-            disabled={existingBusy || !existingIdentifier.trim() || !existingDepartmentId}
-            className="rounded-full bg-[#051A2D] px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+        <div className="mb-4 space-y-3">
+          <form
+            onSubmit={(e) => void onAddExisting(e)}
+            className="flex flex-wrap items-end gap-2 rounded-[24px] border border-black/[0.04] bg-white p-4"
           >
-            {existingBusy ? "Adding…" : "Add to this organization"}
-          </button>
-        </form>
+            <label className="min-w-[220px] flex-1">
+              <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-[#8B95A5]">
+                Add existing member
+              </span>
+              <input
+                value={existingIdentifier}
+                onChange={(e) => setExistingIdentifier(e.target.value)}
+                placeholder="Username or email from the other organization"
+                className={fieldClass}
+              />
+            </label>
+            <label className="min-w-[180px]">
+              <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-[#8B95A5]">
+                Department
+              </span>
+              <select
+                value={existingDepartmentId}
+                onChange={(e) => setExistingDepartmentId(e.target.value)}
+                className={fieldClass}
+              >
+                {departments
+                  .filter((department) => department.isActive)
+                  .map((department) => (
+                    <option key={department.id} value={department.id}>
+                      {department.name}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <button
+              type="submit"
+              disabled={existingBusy || !existingIdentifier.trim() || !existingDepartmentId}
+              className="rounded-full bg-[#051A2D] px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+            >
+              {existingBusy ? "Adding…" : "Add to this organization"}
+            </button>
+          </form>
+
+          <form
+            onSubmit={(e) => void onInvite(e)}
+            className="flex flex-wrap items-end gap-2 rounded-[24px] border border-black/[0.04] bg-white p-4"
+          >
+            <label className="min-w-[220px] flex-1">
+              <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-[#8B95A5]">
+                Invite by email
+              </span>
+              <input
+                type="email"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                placeholder="name@company.com"
+                className={fieldClass}
+              />
+            </label>
+            <label className="min-w-[180px]">
+              <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-[#8B95A5]">
+                Department
+              </span>
+              <select
+                value={inviteDepartmentId}
+                onChange={(e) => setInviteDepartmentId(e.target.value)}
+                className={fieldClass}
+              >
+                {departments
+                  .filter((department) => department.isActive)
+                  .map((department) => (
+                    <option key={department.id} value={department.id}>
+                      {department.name}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <label className="flex items-center gap-2 pb-2.5 text-sm font-medium text-[#4B5563]">
+              <input
+                type="checkbox"
+                checked={inviteIsAdmin}
+                onChange={(e) => setInviteIsAdmin(e.target.checked)}
+                className="h-4 w-4 rounded border-black/20"
+              />
+              Org admin
+            </label>
+            <button
+              type="submit"
+              disabled={inviteBusy || !inviteEmail.trim() || !inviteDepartmentId}
+              className="rounded-full border border-[#051A2D] bg-white px-5 py-2.5 text-sm font-bold text-[#051A2D] disabled:opacity-50"
+            >
+              {inviteBusy ? "Inviting…" : "Send invite"}
+            </button>
+          </form>
+
+          {lastInviteLink ? (
+            <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+              <p className="font-semibold">Invite link</p>
+              <p className="mt-1 break-all font-mono text-xs">{lastInviteLink}</p>
+            </div>
+          ) : null}
+
+          {pendingInvites.length > 0 ? (
+            <div className="overflow-hidden rounded-[24px] border border-black/[0.04] bg-white">
+              <div className="border-b border-black/[0.04] px-4 py-3 text-xs font-bold uppercase tracking-wide text-[#8B95A5]">
+                Pending invitations
+              </div>
+              <ul className="divide-y divide-black/[0.04]">
+                {pendingInvites.map((invite) => (
+                  <li
+                    key={invite.id}
+                    className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm"
+                  >
+                    <div>
+                      <p className="font-semibold text-[#0B1220]">{invite.email}</p>
+                      <p className="text-[#8B95A5]">
+                        {invite.departmentName}
+                        {invite.isOrgAdmin ? " · Admin" : ""} · expires{" "}
+                        {new Date(invite.expiresAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void onRevokeInvite(invite)}
+                      className="rounded-full border border-red-200 px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-50"
+                    >
+                      Revoke
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </div>
       ) : null}
 
       {error ? (
