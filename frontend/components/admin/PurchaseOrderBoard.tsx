@@ -9,6 +9,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import { ApiError } from "@/lib/api";
 import { canViewOrderFinancialHistory, getSession, isAdmin } from "@/lib/auth";
@@ -430,7 +431,16 @@ function rejectedResubmitUnchanged(
   return true;
 }
 
+function parseOrderStatusParam(value: string | null): "All" | OrderStatus {
+  if (!value) return "All";
+  return (ORDER_STATUSES as readonly string[]).includes(value)
+    ? (value as OrderStatus)
+    : "All";
+}
+
 export default function PurchaseOrderBoard() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const session = getSession();
   const organizationName = session?.organization?.name?.trim() || "Your organization";
   const admin = isAdmin(session?.user.role ?? "");
@@ -453,8 +463,10 @@ export default function PurchaseOrderBoard() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [view, setView] = useState<ViewMode>("kanban");
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"All" | OrderStatus>("All");
+  const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
+  const [statusFilter, setStatusFilter] = useState<"All" | OrderStatus>(() =>
+    parseOrderStatusParam(searchParams.get("status")),
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -511,6 +523,30 @@ export default function PurchaseOrderBoard() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    setSearch(searchParams.get("q") ?? "");
+    setStatusFilter(parseOrderStatusParam(searchParams.get("status")));
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (searchParams.get("create") !== "1" || !canEdit) return;
+    openCreate();
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete("create");
+    const qs = next.toString();
+    router.replace(qs ? `/admin/purchase-orders?${qs}` : "/admin/purchase-orders");
+    // Intentionally run once when create=1 appears.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, canEdit, router]);
+
+  function syncOrderFilters(nextSearch: string, nextStatus: "All" | OrderStatus) {
+    const params = new URLSearchParams();
+    if (nextSearch.trim()) params.set("q", nextSearch.trim());
+    if (nextStatus !== "All") params.set("status", nextStatus);
+    const qs = params.toString();
+    router.replace(qs ? `/admin/purchase-orders?${qs}` : "/admin/purchase-orders");
+  }
 
   const buyers = useMemo(
     () => companies.filter((c) => c.type === "Buyer" || c.type === "Both"),
@@ -1122,7 +1158,11 @@ export default function PurchaseOrderBoard() {
           <span className="sr-only">Search orders</span>
           <input
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              const next = e.target.value;
+              setSearch(next);
+              syncOrderFilters(next, statusFilter);
+            }}
             placeholder="Search by order number, buyer, or vendor…"
             className="w-full rounded-2xl border border-black/[0.06] bg-white px-4 py-2.5 text-sm font-medium text-[#0B1220] outline-none ring-[#051A2D]/30 placeholder:text-[#8B95A5] focus:ring-2"
           />
@@ -1131,7 +1171,11 @@ export default function PurchaseOrderBoard() {
           <span className="sr-only">Filter by status</span>
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as "All" | OrderStatus)}
+            onChange={(e) => {
+              const next = e.target.value as "All" | OrderStatus;
+              setStatusFilter(next);
+              syncOrderFilters(search, next);
+            }}
             className="rounded-2xl border border-black/[0.06] bg-white px-4 py-2.5 text-sm font-bold text-[#051A2D] outline-none focus:ring-2 focus:ring-[#051A2D]/30"
           >
             <option value="All">All statuses</option>

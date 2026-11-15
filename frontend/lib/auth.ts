@@ -7,6 +7,7 @@ export type AuthUser = {
   fullName: string;
   email: string;
   role: string;
+  department?: string | null;
 };
 
 export type AuthSession = {
@@ -135,6 +136,9 @@ export function getSession(): AuthSession | null {
         fullName: String(user.fullName ?? user.username ?? ""),
         email: String(user.email ?? ""),
         role: String(user.role ?? org?.role ?? ""),
+        department: String(
+          user.department ?? user.Department ?? "",
+        ) || null,
       },
       permissions: normalizePermissions(parsed.permissions ?? parsed.Permissions),
       organization: org as OrganizationSummary | null,
@@ -234,6 +238,10 @@ export function isAdmin(role: string) {
 
 export function isFinance(role: string) {
   return role.toLowerCase() === "finance";
+}
+
+export function isProcurement(role: string) {
+  return role.toLowerCase() === "procurementmanager";
 }
 
 /** Org admin / Finance can see full financial field-change audit on orders. */

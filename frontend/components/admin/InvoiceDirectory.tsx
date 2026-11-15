@@ -8,6 +8,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import { ApiError } from "@/lib/api";
 import { getSession, isAdmin } from "@/lib/auth";
@@ -70,7 +71,19 @@ function fromInvoice(invoice: Invoice): FormState {
   };
 }
 
+type InvoiceStatusFilter = "All" | "Open" | InvoiceStatus;
+
+function parseInvoiceStatusParam(value: string | null): InvoiceStatusFilter {
+  if (!value) return "All";
+  if (value === "Open") return "Open";
+  return (INVOICE_STATUSES as readonly string[]).includes(value)
+    ? (value as InvoiceStatus)
+    : "All";
+}
+
 export default function InvoiceDirectory() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const session = getSession();
   const canEdit = canEditPage(
     session?.permissions,
@@ -80,8 +93,10 @@ export default function InvoiceDirectory() {
 
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"All" | InvoiceStatus>("All");
+  const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
+  const [statusFilter, setStatusFilter] = useState<InvoiceStatusFilter>(() =>
+    parseInvoiceStatusParam(searchParams.get("status")),
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -119,6 +134,29 @@ export default function InvoiceDirectory() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    setSearch(searchParams.get("q") ?? "");
+    setStatusFilter(parseInvoiceStatusParam(searchParams.get("status")));
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (searchParams.get("create") !== "1" || !canEdit) return;
+    openCreate();
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete("create");
+    const qs = next.toString();
+    router.replace(qs ? `/admin/invoices?${qs}` : "/admin/invoices");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, canEdit, router]);
+
+  function syncInvoiceFilters(nextSearch: string, nextStatus: InvoiceStatusFilter) {
+    const params = new URLSearchParams();
+    if (nextSearch.trim()) params.set("q", nextSearch.trim());
+    if (nextStatus !== "All") params.set("status", nextStatus);
+    const qs = params.toString();
+    router.replace(qs ? `/admin/invoices?${qs}` : "/admin/invoices");
+  }
+
   const invoiceableOrders = useMemo(
     () => orders.filter(canInvoiceOrder),
     [orders],
@@ -127,7 +165,17 @@ export default function InvoiceDirectory() {
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     return invoices.filter((invoice) => {
-      if (statusFilter !== "All" && invoice.status !== statusFilter) return false;
+      if (statusFilter === "Open") {
+        if (
+          invoice.status !== "Unpaid" &&
+          invoice.status !== "PartiallyPaid" &&
+          invoice.status !== "Overdue"
+        ) {
+          return false;
+        }
+      } else if (statusFilter !== "All" && invoice.status !== statusFilter) {
+        return false;
+      }
       if (!term) return true;
       const haystack = [
         invoice.invoiceNumber,
@@ -358,7 +406,11 @@ export default function InvoiceDirectory() {
           <span className="sr-only">Search invoices</span>
           <input
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              const next = e.target.value;
+              setSearch(next);
+              syncInvoiceFilters(next, statusFilter);
+            }}
             placeholder="Search by invoice #, order, buyer, or vendor…"
             className="w-full rounded-2xl border border-black/[0.06] bg-white px-4 py-2.5 text-sm font-medium text-[#0B1220] outline-none ring-[#051A2D]/30 placeholder:text-[#8B95A5] focus:ring-2"
           />
@@ -367,12 +419,15 @@ export default function InvoiceDirectory() {
           <span className="sr-only">Filter by status</span>
           <select
             value={statusFilter}
-            onChange={(e) =>
-              setStatusFilter(e.target.value as "All" | InvoiceStatus)
-            }
+            onChange={(e) => {
+              const next = e.target.value as InvoiceStatusFilter;
+              setStatusFilter(next);
+              syncInvoiceFilters(search, next);
+            }}
             className="rounded-2xl border border-black/[0.06] bg-white px-4 py-2.5 text-sm font-bold text-[#051A2D] outline-none focus:ring-2 focus:ring-[#051A2D]/30"
           >
             <option value="All">All statuses</option>
+            <option value="Open">Open</option>
             {INVOICE_STATUSES.map((status) => (
               <option key={status} value={status}>
                 {invoiceStatusLabel(status)}

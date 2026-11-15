@@ -23,6 +23,7 @@ public static class SampleDataSeeder
         await EnsurePlatformAdminAsync(db, passwords);
         var org = await EnsureDefaultOrganizationAsync(db, admin, catalog);
         await EnsureDemoAuditLogsAsync(db, admin, employees, org.Id);
+        await EnsureOrderCraftOpsDemoAsync(db, admin, employees, org.Id);
         await EnsureTestTenantsAsync(db, passwords, catalog);
         await AlignDemoPasswordHashesAsync(db, passwords);
     }
@@ -197,6 +198,11 @@ public static class SampleDataSeeder
 
             if (existing is not null)
             {
+                if (existing.Role != spec.Role || existing.Department != spec.Dept)
+                {
+                    existing.Role = spec.Role;
+                    existing.Department = spec.Dept;
+                }
                 created.Add(existing);
                 continue;
             }
@@ -272,6 +278,340 @@ public static class SampleDataSeeder
 
         db.AuditLogs.AddRange(logs);
         await db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Seeds companies, products, orders, and invoices for the OrderCraft org
+    /// so the dashboard Needs attention / Overview cards have real numbers.
+    /// Idempotent via DEMO-* order numbers.
+    /// </summary>
+    private static async Task EnsureOrderCraftOpsDemoAsync(
+        ApplicationDbContext db,
+        User admin,
+        IReadOnlyList<User> employees,
+        Guid organizationId)
+    {
+        if (await db.Orders.IgnoreQueryFilters().AnyAsync(o =>
+                o.OrganizationId == organizationId &&
+                !o.IsDeleted &&
+                o.OrderNumber.StartsWith("DEMO-")))
+            return;
+
+        var sara = employees.FirstOrDefault(e => e.Username == "sara.procurement") ?? admin;
+        var omar = employees.FirstOrDefault(e => e.Username == "omar.finance") ?? admin;
+        var layla = employees.FirstOrDefault(e => e.Username == "layla.buyer") ?? admin;
+        var now = DateTime.UtcNow;
+
+        var vendor = await db.Companies.IgnoreQueryFilters().FirstOrDefaultAsync(c =>
+            c.OrganizationId == organizationId &&
+            !c.IsDeleted &&
+            c.Name == "Gulf Supply Co.");
+        if (vendor is null)
+        {
+            vendor = new Company
+            {
+                OrganizationId = organizationId,
+                Name = "Gulf Supply Co.",
+                Email = "sales@gulfsupply.demo",
+                Phone = "+15551002001",
+                Address = "12 Industrial Rd",
+                Type = CompanyType.Supplier,
+                Status = CompanyStatus.Active,
+                PaymentTerm = "Net 30",
+                PerformanceScore = 4.5m,
+                CreatedAt = now.AddDays(-20)
+            };
+            db.Companies.Add(vendor);
+        }
+
+        var client = await db.Companies.IgnoreQueryFilters().FirstOrDefaultAsync(c =>
+            c.OrganizationId == organizationId &&
+            !c.IsDeleted &&
+            c.Name == "Desert Parts LLC");
+        if (client is null)
+        {
+            client = new Company
+            {
+                OrganizationId = organizationId,
+                Name = "Desert Parts LLC",
+                Email = "orders@desertparts.demo",
+                Phone = "+15551002002",
+                Address = "88 Trade Ave",
+                Type = CompanyType.Buyer,
+                Status = CompanyStatus.Active,
+                CreditLimit = 50000m,
+                PaymentTerm = "Net 30",
+                CreatedAt = now.AddDays(-18)
+            };
+            db.Companies.Add(client);
+        }
+
+        await db.SaveChangesAsync();
+
+        var gloves = await EnsureDemoProductAsync(
+            db, organizationId, vendor.Id, "Industrial Gloves XL", "GLV-XL-01", 12.50m, 400, now.AddDays(-19));
+        var helmets = await EnsureDemoProductAsync(
+            db, organizationId, vendor.Id, "Safety Helmets", "HLM-STD-01", 28.00m, 180, now.AddDays(-19));
+        var vests = await EnsureDemoProductAsync(
+            db, organizationId, vendor.Id, "Hi-Vis Vests", "VST-HV-01", 9.75m, 260, now.AddDays(-15));
+        await db.SaveChangesAsync();
+
+        // Pending approvals (Needs attention)
+        var pendingA = BuildDemoOrder(
+            organizationId, admin.Id, "DEMO-PO-1001", OrderStatus.Pending,
+            vendor, "OrderCraft", now.AddDays(-5), gloves, 40, 0m);
+        var pendingB = BuildDemoOrder(
+            organizationId, sara.Id, "DEMO-PO-1002", OrderStatus.Pending,
+            vendor, "OrderCraft", now.AddDays(-3), helmets, 25, 0m);
+        var pendingC = BuildDemoOrder(
+            organizationId, layla.Id, "DEMO-PO-1003", OrderStatus.Pending,
+            vendor, "OrderCraft", now.AddDays(-2), vests, 60, 0m);
+        var pendingD = BuildDemoOrder(
+            organizationId, sara.Id, "DEMO-PO-1004", OrderStatus.Pending,
+            vendor, "OrderCraft", now.AddDays(-1), gloves, 20, helmets, 10);
+        var pendingE = BuildDemoOrder(
+            organizationId, layla.Id, "DEMO-PO-1005", OrderStatus.Pending,
+            vendor, "OrderCraft", now.AddHours(-10), vests, 35, 0m);
+
+        // Drafts
+        var draftA = BuildDemoOrder(
+            organizationId, sara.Id, "DEMO-PO-1006", OrderStatus.Draft,
+            vendor, "OrderCraft", now.AddDays(-4), gloves, 15, 0m);
+        var draftB = BuildDemoOrder(
+            organizationId, layla.Id, "DEMO-PO-1007", OrderStatus.Draft,
+            vendor, "OrderCraft", now.AddDays(-1), helmets, 8, 0m);
+
+        // Approved (Overview + invoiceable)
+        var approvedA = BuildDemoOrder(
+            organizationId, sara.Id, "DEMO-PO-1008", OrderStatus.Approved,
+            vendor, "OrderCraft", now.AddDays(-12), gloves, 100, 0m);
+        var approvedB = BuildDemoOrder(
+            organizationId, admin.Id, "DEMO-PO-1009", OrderStatus.Approved,
+            vendor, "OrderCraft", now.AddDays(-8), helmets, 50, 0m);
+        var approvedC = BuildDemoOrder(
+            organizationId, layla.Id, "DEMO-PO-1010", OrderStatus.Approved,
+            vendor, "OrderCraft", now.AddDays(-6), vests, 80, 0m);
+
+        // Older approved (prior 30d window) for trend contrast
+        var approvedOld = BuildDemoOrder(
+            organizationId, sara.Id, "DEMO-PO-0901", OrderStatus.Approved,
+            vendor, "OrderCraft", now.AddDays(-45), gloves, 30, 0m);
+
+        var orders = new[]
+        {
+            pendingA, pendingB, pendingC, pendingD, pendingE,
+            draftA, draftB,
+            approvedA, approvedB, approvedC, approvedOld
+        };
+        db.Orders.AddRange(orders);
+        await db.SaveChangesAsync();
+
+        var invOpen = new Invoice
+        {
+            OrganizationId = organizationId,
+            OrderId = approvedA.Id,
+            InvoiceNumber = "DEMO-INV-2001",
+            Currency = "USD",
+            Amount = approvedA.TotalAmount,
+            Status = InvoiceStatus.Unpaid,
+            DueDate = now.AddDays(20)
+        };
+        var invPartial = new Invoice
+        {
+            OrganizationId = organizationId,
+            OrderId = approvedB.Id,
+            InvoiceNumber = "DEMO-INV-2002",
+            Currency = "USD",
+            Amount = approvedB.TotalAmount,
+            Status = InvoiceStatus.PartiallyPaid,
+            DueDate = now.AddDays(10)
+        };
+        var invOverdue = new Invoice
+        {
+            OrganizationId = organizationId,
+            OrderId = approvedC.Id,
+            InvoiceNumber = "DEMO-INV-2003",
+            Currency = "USD",
+            Amount = approvedC.TotalAmount,
+            Status = InvoiceStatus.Overdue,
+            DueDate = now.AddDays(-12)
+        };
+        var invPaid = new Invoice
+        {
+            OrganizationId = organizationId,
+            OrderId = approvedOld.Id,
+            InvoiceNumber = "DEMO-INV-1901",
+            Currency = "USD",
+            Amount = approvedOld.TotalAmount,
+            Status = InvoiceStatus.Paid,
+            DueDate = now.AddDays(-40)
+        };
+
+        db.Invoices.AddRange(invOpen, invPartial, invOverdue, invPaid);
+        await db.SaveChangesAsync();
+
+        db.Payments.AddRange(
+            new Payment
+            {
+                OrganizationId = organizationId,
+                InvoiceId = invPartial.Id,
+                Amount = InvoiceMoney.Round(approvedB.TotalAmount * 0.4m),
+                RecordedByUserId = omar.Id,
+                RecordedByName = omar.FullName,
+                PaidAt = now.AddDays(-2)
+            },
+            new Payment
+            {
+                OrganizationId = organizationId,
+                InvoiceId = invPaid.Id,
+                Amount = approvedOld.TotalAmount,
+                RecordedByUserId = omar.Id,
+                RecordedByName = omar.FullName,
+                PaidAt = now.AddDays(-35)
+            });
+
+        vendor.OrderCount = orders.Length;
+        vendor.TotalSpend = orders
+            .Where(o => o.Status is OrderStatus.Approved or OrderStatus.Pending)
+            .Sum(o => o.TotalAmount);
+        client.OrderCount = 0;
+
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task<Product> EnsureDemoProductAsync(
+        ApplicationDbContext db,
+        Guid organizationId,
+        Guid companyId,
+        string name,
+        string sku,
+        decimal price,
+        int stock,
+        DateTime createdAt)
+    {
+        var existing = await db.Products.IgnoreQueryFilters().FirstOrDefaultAsync(p =>
+            p.OrganizationId == organizationId &&
+            !p.IsDeleted &&
+            p.SKU == sku);
+        if (existing is not null)
+            return existing;
+
+        var product = new Product
+        {
+            OrganizationId = organizationId,
+            CompanyId = companyId,
+            Name = name,
+            SKU = sku,
+            Price = price,
+            StockQuantity = stock,
+            IsActive = true,
+            Description = $"{DemoMarker} catalog item"
+        };
+        db.Products.Add(product);
+        return product;
+    }
+
+    private static Order BuildDemoOrder(
+        Guid organizationId,
+        Guid createdByUserId,
+        string orderNumber,
+        OrderStatus status,
+        Company vendor,
+        string buyerName,
+        DateTime orderDate,
+        Product product,
+        int quantity,
+        decimal discount)
+    {
+        var lineTotal = InvoiceMoney.Round(product.Price * quantity - discount);
+        var taxRate = 5m;
+        var total = lineTotal + InvoiceMoney.Tax(lineTotal, taxRate);
+        return new Order
+        {
+            OrganizationId = organizationId,
+            OrderNumber = orderNumber,
+            Direction = OrderDirection.Purchase,
+            BuyerCompanyId = null,
+            BuyerCompanyName = buyerName,
+            SupplierCompanyId = vendor.Id,
+            SupplierCompanyName = vendor.Name,
+            CreatedByUserId = createdByUserId,
+            Status = status,
+            TotalAmount = total,
+            OrderDate = orderDate,
+            DeliveryDate = orderDate.AddDays(14),
+            PaymentTerms = PaymentTerms.Net30,
+            TaxRate = taxRate,
+            Notes = $"{DemoMarker} seeded for dashboard",
+            OrderItems =
+            {
+                new OrderItem
+                {
+                    ProductId = product.Id,
+                    Quantity = quantity,
+                    UnitPrice = product.Price,
+                    DiscountAmount = discount,
+                    TotalPrice = lineTotal
+                }
+            }
+        };
+    }
+
+    private static Order BuildDemoOrder(
+        Guid organizationId,
+        Guid createdByUserId,
+        string orderNumber,
+        OrderStatus status,
+        Company vendor,
+        string buyerName,
+        DateTime orderDate,
+        Product productA,
+        int qtyA,
+        Product productB,
+        int qtyB)
+    {
+        var lineA = InvoiceMoney.Round(productA.Price * qtyA);
+        var lineB = InvoiceMoney.Round(productB.Price * qtyB);
+        var subtotal = lineA + lineB;
+        var taxRate = 5m;
+        var total = subtotal + InvoiceMoney.Tax(subtotal, taxRate);
+        return new Order
+        {
+            OrganizationId = organizationId,
+            OrderNumber = orderNumber,
+            Direction = OrderDirection.Purchase,
+            BuyerCompanyId = null,
+            BuyerCompanyName = buyerName,
+            SupplierCompanyId = vendor.Id,
+            SupplierCompanyName = vendor.Name,
+            CreatedByUserId = createdByUserId,
+            Status = status,
+            TotalAmount = total,
+            OrderDate = orderDate,
+            DeliveryDate = orderDate.AddDays(14),
+            PaymentTerms = PaymentTerms.Net30,
+            TaxRate = taxRate,
+            Notes = $"{DemoMarker} seeded for dashboard",
+            OrderItems =
+            {
+                new OrderItem
+                {
+                    ProductId = productA.Id,
+                    Quantity = qtyA,
+                    UnitPrice = productA.Price,
+                    DiscountAmount = 0m,
+                    TotalPrice = lineA
+                },
+                new OrderItem
+                {
+                    ProductId = productB.Id,
+                    Quantity = qtyB,
+                    UnitPrice = productB.Price,
+                    DiscountAmount = 0m,
+                    TotalPrice = lineB
+                }
+            }
+        };
     }
 
     private static async Task EnsurePlatformAdminAsync(ApplicationDbContext db, IPasswordService passwords)
@@ -391,11 +731,6 @@ public static class SampleDataSeeder
         UserRole role,
         string? departmentName)
     {
-        var exists = await db.OrganizationMemberships.AnyAsync(m =>
-            m.OrganizationId == org.Id && m.UserId == user.Id);
-        if (exists)
-            return;
-
         await catalog.EnsureDefaultsAsync(org.Id);
         var orgRole = await catalog.RequireRoleAsync(org.Id, role);
         OrganizationDepartment? department = null;
@@ -406,7 +741,24 @@ public static class SampleDataSeeder
                     d.OrganizationId == org.Id && d.Name.ToLower() == departmentName.Trim().ToLower());
         }
 
-        var membership = new OrganizationMembership
+        var membership = await db.OrganizationMemberships
+            .FirstOrDefaultAsync(m => m.OrganizationId == org.Id && m.UserId == user.Id);
+
+        if (membership is not null)
+        {
+            if (membership.Role != role || membership.OrganizationRoleId != orgRole.Id)
+            {
+                UserMappings.AssignCatalog(membership, orgRole, department);
+                var previous = await db.UserPagePermissions
+                    .Where(p => p.MembershipId == membership.Id)
+                    .ToListAsync();
+                db.UserPagePermissions.RemoveRange(previous);
+                UserMappings.SeedDefaultPermissions(db, membership, role);
+            }
+            return;
+        }
+
+        membership = new OrganizationMembership
         {
             OrganizationId = org.Id,
             UserId = user.Id,

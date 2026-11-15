@@ -48,7 +48,8 @@ public static class UserMappings
             Username = user.Username,
             FullName = user.FullName,
             Email = user.Email,
-            Role = membership?.OrganizationRole?.Key ?? privilege.ToString()
+            Role = membership?.OrganizationRole?.Key ?? privilege.ToString(),
+            Department = membership?.OrganizationDepartment?.Name ?? user.Department
         };
     }
 

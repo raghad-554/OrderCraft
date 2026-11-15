@@ -219,7 +219,7 @@ export default function AuditLogBoard() {
                 <th className="px-5 py-3.5">Action</th>
                 <th className="px-5 py-3.5">Related to</th>
                 <th className="px-5 py-3.5">Details</th>
-                <th className="px-5 py-3.5">Request</th>
+                <th className="px-5 py-3.5">Request ID</th>
               </tr>
             </thead>
             <tbody>

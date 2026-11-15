@@ -8,6 +8,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { useSearchParams } from "next/navigation";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import { ApiError } from "@/lib/api";
 import { getSession, isAdmin } from "@/lib/auth";
@@ -273,10 +274,13 @@ export default function CompanyDirectory({
   );
   const [mode, setMode] = useState<Mode>(initialMode);
   const config = MODE_CONFIG[mode];
+  const searchParams = useSearchParams();
   const [companies, setCompanies] = useState<Company[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
+  const [debouncedSearch, setDebouncedSearch] = useState(
+    () => searchParams.get("q") ?? "",
+  );
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -291,6 +295,12 @@ export default function CompanyDirectory({
     const timer = window.setTimeout(() => setDebouncedSearch(search), 300);
     return () => window.clearTimeout(timer);
   }, [search]);
+
+  useEffect(() => {
+    const q = searchParams.get("q") ?? "";
+    setSearch(q);
+    setDebouncedSearch(q);
+  }, [searchParams]);
 
   const load = useCallback(async () => {
     setLoading(true);

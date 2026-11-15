@@ -69,6 +69,7 @@ public class OrganizationService : IOrganizationService
             .Include(m => m.Organization)
             .Include(m => m.User)
             .Include(m => m.OrganizationRole)
+            .Include(m => m.OrganizationDepartment)
             .FirstOrDefaultAsync(
                 m => m.UserId == userId && m.OrganizationId == organizationId,
                 cancellationToken);

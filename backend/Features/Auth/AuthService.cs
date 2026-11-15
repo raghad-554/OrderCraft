@@ -111,6 +111,7 @@ public class AuthService : IAuthService
             .IgnoreQueryFilters()
             .Include(m => m.Organization)
             .Include(m => m.OrganizationRole)
+            .Include(m => m.OrganizationDepartment)
             .Where(m =>
                 m.UserId == user.Id
                 && m.Status == MembershipStatus.Active

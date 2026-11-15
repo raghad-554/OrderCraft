@@ -8,6 +8,7 @@ using Swashbuckle.AspNetCore.SwaggerGen;
 using Swashbuckle.AspNetCore.SwaggerUI;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddHttpContextAccessor();
 
 builder.Configuration.AddJsonFile(
     "appsettings.Local.json",
@@ -75,9 +76,28 @@ builder.Services.AddSwaggerGen(options =>
     options.DocumentFilter<SwaggerTagsDocumentFilter>();
 });
 
-// Entity Framework Core + PostgreSQL
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+// Entity Framework Core + PostgreSQL (tenant GUC via TenantConnectionInterceptor)
+builder.Services.AddScoped<TenantConnectionInterceptor>(sp =>
+{
+    var tenant = sp.GetService<ITenantContext>();
+    if (tenant?.OrganizationId is Guid orgId && orgId != Guid.Empty)
+        return new TenantConnectionInterceptor(orgId.ToString());
+
+    var httpUser = sp.GetRequiredService<IHttpContextAccessor>().HttpContext?.User;
+    var claim =
+        httpUser?.FindFirst(TenantMiddleware.OrgIdClaim)?.Value
+        ?? httpUser?.FindFirst("organizationId")?.Value
+        ?? string.Empty;
+
+    return new TenantConnectionInterceptor(claim);
+});
+
+builder.Services.AddDbContext<ApplicationDbContext>((sp, options) =>
+{
+    var interceptor = sp.GetRequiredService<TenantConnectionInterceptor>();
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"))
+        .AddInterceptors(interceptor);
+});
 
 // JWT Authentication
 builder.Services.AddOrderCraftJwtAuthentication(builder.Configuration);
