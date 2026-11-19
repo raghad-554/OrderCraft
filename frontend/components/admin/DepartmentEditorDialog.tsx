@@ -16,7 +16,7 @@ import {
 } from "@/lib/permissions";
 
 const fieldClass =
-  "w-full rounded-2xl border border-black/[0.06] bg-[#F3F5F7] px-3.5 py-2.5 text-sm font-medium text-[#0B1220] outline-none focus:bg-white focus:ring-2 focus:ring-[#051A2D]/30";
+  "w-full rounded-2xl border border-black/[0.06] bg-[#d4dee9] px-3.5 py-2.5 text-sm font-medium text-[#0B1220] outline-none focus:bg-[#e4ebf2] focus:ring-2 focus:ring-[#051A2D]/30";
 
 function draftFrom(
   catalog: PageCatalogItem[],
@@ -101,13 +101,13 @@ export default function DepartmentEditorDialog({
           if (!saving) onClose();
         }}
       />
-      <div className="relative z-10 max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[28px] bg-white p-6 shadow-2xl sm:p-7">
+      <div className="relative z-10 max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[28px] bg-[#e4ebf2] p-6 shadow-2xl sm:p-7">
         <div className="mb-5 flex items-start justify-between gap-3">
           <div>
             <h2 className="text-xl font-bold text-[#0B1220]">
               {department ? "Edit department" : "Add department"}
             </h2>
-            <p className="mt-1 text-sm font-medium text-[#8B95A5]">
+            <p className="mt-1 text-sm font-semibold text-[#5B6577]">
               People in this department get these page permissions by default. You can still
               change access for one person later.
             </p>
@@ -116,7 +116,7 @@ export default function DepartmentEditorDialog({
             type="button"
             onClick={onClose}
             disabled={saving}
-            className="rounded-full px-3 py-1 text-sm font-bold text-[#8B95A5] hover:bg-[#F3F5F7] disabled:opacity-50"
+            className="rounded-full px-3 py-1 text-sm font-bold text-[#5B6577] hover:bg-[#d4dee9] disabled:opacity-50"
           >
             Close
           </button>
@@ -124,7 +124,7 @@ export default function DepartmentEditorDialog({
 
         <form onSubmit={(e) => void onSubmit(e)} className="space-y-4">
           <label className="block">
-            <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-[#8B95A5]">
+            <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-[#5B6577]">
               Department name *
             </span>
             <input
@@ -141,12 +141,12 @@ export default function DepartmentEditorDialog({
               return (
                 <div
                   key={page.key}
-                  className="rounded-[20px] border border-black/[0.04] bg-[#F8FAFB] px-4 py-3"
+                  className="rounded-[20px] border border-black/[0.04] bg-[#e8eef4] px-4 py-3"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <p className="font-semibold text-[#0B1220]">{page.label}</p>
-                      <p className="mt-0.5 text-xs font-medium text-[#8B95A5]">
+                      <p className="mt-0.5 text-xs font-semibold text-[#5B6577]">
                         {page.description}
                       </p>
                     </div>
@@ -161,7 +161,7 @@ export default function DepartmentEditorDialog({
                             className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${
                               active
                                 ? "bg-[#051A2D] text-white"
-                                : "bg-white text-[#051A2D] ring-1 ring-black/[0.08]"
+                                : "bg-[#e4ebf2] text-[#051A2D] ring-1 ring-black/[0.08]"
                             }`}
                           >
                             {accessLabel(option)}
@@ -186,7 +186,7 @@ export default function DepartmentEditorDialog({
               type="button"
               onClick={onClose}
               disabled={saving}
-              className="rounded-full px-4 py-2.5 text-sm font-bold text-[#8B95A5] hover:bg-[#F3F5F7] disabled:opacity-50"
+              className="rounded-full px-4 py-2.5 text-sm font-bold text-[#5B6577] hover:bg-[#d4dee9] disabled:opacity-50"
             >
               Cancel
             </button>

@@ -1,8 +1,8 @@
-import { clearSession, getAuthToken } from "@/lib/auth";
+import { clearSession } from "@/lib/auth";
 
+/** Empty = same-origin (Next.js rewrites /api → backend). Override with NEXT_PUBLIC_API_URL if needed. */
 export const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ||
-  "http://localhost:5069";
+  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "";
 
 export class ApiError extends Error {
   status: number;
@@ -25,15 +25,10 @@ export async function apiFetch<T>(
   path: string,
   init: RequestInit = {},
 ): Promise<T> {
-  const token = getAuthToken();
   const headers = new Headers(init.headers);
 
   if (!headers.has("Content-Type") && !(init.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
-  }
-
-  if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
   }
 
   let response: Response;
@@ -41,11 +36,12 @@ export async function apiFetch<T>(
     response = await fetch(`${API_BASE}${path}`, {
       ...init,
       headers,
+      credentials: "include",
     });
   } catch {
     throw new ApiError(
       0,
-      `Cannot reach API at ${API_BASE}. Is the backend running?`,
+      `Cannot reach API at ${API_BASE || "same origin"}. Is the backend running?`,
     );
   }
 

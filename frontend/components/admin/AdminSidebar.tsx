@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import ScrollSelect from "@/components/ui/ScrollSelect";
 import { isAdmin } from "@/lib/auth";
 import { type OrganizationSummary } from "@/lib/organizations";
 import {
@@ -134,8 +135,8 @@ export default function AdminSidebar({
   return (
     <aside className="flex h-full w-[248px] shrink-0 flex-col px-4 py-5 text-white lg:w-[260px]">
       <div className="flex items-center gap-3 px-2 pb-6 pt-1">
-        <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#2DD4A8]/15 ring-1 ring-[#2DD4A8]/35">
-          <svg viewBox="0 0 24 24" className="h-5 w-5 text-[#2DD4A8]" fill="none" stroke="currentColor" strokeWidth="1.9">
+        <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/12 ring-1 ring-white/25">
+          <svg viewBox="0 0 24 24" className="h-5 w-5 text-white" fill="none" stroke="currentColor" strokeWidth="1.9">
             <path strokeLinecap="round" strokeLinejoin="round" d="M4 7h16M4 12h10M4 17h14" />
             <path strokeLinecap="round" strokeLinejoin="round" d="M16 10l4 2-4 2" />
           </svg>
@@ -160,7 +161,7 @@ export default function AdminSidebar({
                   : "text-white/55 hover:bg-white/[0.06] hover:text-white/90"
               }`}
             >
-              <span className={active ? "text-[#2DD4A8]" : "text-white/45"}>
+              <span className={active ? "text-white" : "text-white/45"}>
                 <NavIcon label={item.label} />
               </span>
               {item.label}
@@ -175,17 +176,17 @@ export default function AdminSidebar({
             Organization
           </p>
           {(organizations?.length ?? 0) > 1 ? (
-            <select
+            <ScrollSelect
               value={organization.id}
-              onChange={(event) => onSwitchOrganization?.(event.target.value)}
+              placeholder="Select organization"
+              options={(organizations ?? [organization]).map((org) => ({
+                value: org.id,
+                label: org.name,
+              }))}
+              onChange={(next) => onSwitchOrganization?.(next)}
               className="w-full rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-xs font-semibold text-white outline-none"
-            >
-              {(organizations ?? [organization]).map((org) => (
-                <option key={org.id} value={org.id} className="text-[#051A2D]">
-                  {org.name}
-                </option>
-              ))}
-            </select>
+              allowEmpty={false}
+            />
           ) : (
             <p className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-xs font-semibold text-white">
               {organization.name}
@@ -196,7 +197,7 @@ export default function AdminSidebar({
 
       <div className="mt-4 border-t border-white/10 pt-4">
         <div className="flex items-center gap-3 rounded-2xl px-2 py-2">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#2DD4A8] text-sm font-bold text-[#051A2D]">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#134066] text-sm font-bold text-white">
             {initials(displayName)}
           </span>
           <div className="min-w-0 flex-1">

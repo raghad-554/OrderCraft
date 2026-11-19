@@ -46,6 +46,7 @@ public static class ProcurementMappings
         Description = product.Description,
         SKU = product.SKU,
         Price = product.Price,
+        Currency = product.Currency,
         StockQuantity = product.StockQuantity,
         IsActive = product.IsActive
     };
@@ -89,6 +90,7 @@ public static class ProcurementMappings
             CreatedByUserId = order.CreatedByUserId,
             Status = order.Status,
             TotalAmount = order.TotalAmount,
+            Currency = order.Currency,
             TaxRate = order.TaxRate,
             TaxAmount = taxAmount,
             SubtotalAmount = subtotal,

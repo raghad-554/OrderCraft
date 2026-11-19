@@ -32,7 +32,7 @@ function LevelBadge({ level }: { level: PageAccessLevel }) {
       ? "bg-emerald-50 text-emerald-700"
       : level === "View"
         ? "bg-sky-50 text-sky-700"
-        : "bg-slate-100 text-slate-500";
+        : "bg-slate-100 text-slate-600";
 
   return (
     <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${tone}`}>
@@ -198,10 +198,10 @@ export default function RolesPermissionsPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search employee…"
-            className="w-full rounded-2xl border border-black/[0.06] bg-white px-4 py-2.5 text-sm font-medium text-[#0B1220] outline-none ring-[#051A2D]/30 placeholder:text-[#8B95A5] focus:ring-2"
+            className="w-full rounded-2xl border border-black/[0.06] bg-[#e4ebf2] px-4 py-2.5 text-sm font-medium text-[#0B1220] outline-none ring-[#051A2D]/30 placeholder:text-[#5B6577] focus:ring-2"
           />
         </label>
-        <p className="text-sm font-medium text-[#8B95A5]">
+        <p className="text-sm font-semibold text-[#5B6577]">
           {loading
             ? "Loading…"
             : `${rows.length} ${rows.length === 1 ? "user" : "users"}`}
@@ -227,10 +227,10 @@ export default function RolesPermissionsPage() {
         </div>
       ) : null}
 
-      <div className="overflow-hidden rounded-[24px] border border-black/[0.04] bg-white">
+      <div className="overflow-hidden rounded-[24px] border border-black/[0.04] bg-[#e4ebf2]">
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
-            <thead className="bg-[#F8FAFB] text-xs font-semibold tracking-wide text-[#8B95A5]">
+            <thead className="bg-[#e8eef4] text-xs font-semibold tracking-wide text-[#5B6577]">
               <tr>
                 <th className="px-5 py-3.5">Employee</th>
                 <th className="px-5 py-3.5">Department</th>
@@ -241,13 +241,13 @@ export default function RolesPermissionsPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={4} className="px-5 py-12 text-center text-[#8B95A5]">
+                  <td colSpan={4} className="px-5 py-12 text-center text-[#5B6577]">
                     Loading users…
                   </td>
                 </tr>
               ) : rows.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-5 py-12 text-center text-[#8B95A5]">
+                  <td colSpan={4} className="px-5 py-12 text-center text-[#5B6577]">
                     No employees found.
                   </td>
                 </tr>
@@ -255,11 +255,11 @@ export default function RolesPermissionsPage() {
                 rows.map((employee) => (
                   <tr
                     key={employee.id}
-                    className="border-t border-black/[0.04] transition hover:bg-[#F8FAFB]"
+                    className="border-t border-black/[0.04] transition hover:bg-[#d4dee9]"
                   >
                     <td className="px-5 py-3.5">
                       <p className="font-semibold text-[#0B1220]">{employee.fullName}</p>
-                      <p className="mt-0.5 text-xs font-medium text-[#8B95A5]">
+                      <p className="mt-0.5 text-xs font-semibold text-[#5B6577]">
                         {employee.email}
                       </p>
                     </td>
@@ -308,11 +308,11 @@ export default function RolesPermissionsPage() {
             className="absolute inset-0 bg-[#051A2D]/55"
             onClick={closeEditor}
           />
-          <div className="relative z-10 max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[28px] bg-white p-6 shadow-2xl sm:p-7">
+          <div className="relative z-10 max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[28px] bg-[#e4ebf2] p-6 shadow-2xl sm:p-7">
             <div className="mb-5 flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-xl font-bold text-[#0B1220]">Page access</h2>
-                <p className="mt-1 text-sm font-medium text-[#8B95A5]">
+                <p className="mt-1 text-sm font-semibold text-[#5B6577]">
                   {selected.fullName}
                   {selected.department ? ` · ${selected.department}` : ""}
                 </p>
@@ -320,7 +320,7 @@ export default function RolesPermissionsPage() {
               <button
                 type="button"
                 onClick={closeEditor}
-                className="rounded-full px-3 py-1 text-sm font-bold text-[#8B95A5] hover:bg-[#F3F5F7]"
+                className="rounded-full px-3 py-1 text-sm font-bold text-[#5B6577] hover:bg-[#d4dee9]"
               >
                 Close
               </button>
@@ -344,7 +344,7 @@ export default function RolesPermissionsPage() {
                         : defaultPermissionsForRole(selected.role),
                     );
                   }}
-                  className="rounded-full bg-[#F3F5F7] px-4 py-2 text-xs font-bold text-[#051A2D]"
+                  className="rounded-full bg-[#d4dee9] px-4 py-2 text-xs font-bold text-[#051A2D]"
                 >
                   Apply department defaults
                 </button>
@@ -353,7 +353,7 @@ export default function RolesPermissionsPage() {
                   onClick={() =>
                     setDraft(catalog.map((p) => ({ pageKey: p.key, accessLevel: "Hidden" })))
                   }
-                  className="rounded-full bg-[#F3F5F7] px-4 py-2 text-xs font-bold text-[#051A2D]"
+                  className="rounded-full bg-[#d4dee9] px-4 py-2 text-xs font-bold text-[#051A2D]"
                 >
                   Hide all pages
                 </button>
@@ -367,12 +367,12 @@ export default function RolesPermissionsPage() {
                 return (
                   <div
                     key={page.key}
-                    className="rounded-[20px] border border-black/[0.04] bg-[#F8FAFB] px-4 py-3"
+                    className="rounded-[20px] border border-black/[0.04] bg-[#e8eef4] px-4 py-3"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
                         <p className="font-semibold text-[#0B1220]">{page.label}</p>
-                        <p className="mt-0.5 text-xs font-medium text-[#8B95A5]">
+                        <p className="mt-0.5 text-xs font-semibold text-[#5B6577]">
                           {page.description}
                         </p>
                       </div>
@@ -390,7 +390,7 @@ export default function RolesPermissionsPage() {
                                 className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${
                                   active
                                     ? "bg-[#051A2D] text-white"
-                                    : "bg-white text-[#051A2D] ring-1 ring-black/[0.08]"
+                                    : "bg-[#e4ebf2] text-[#051A2D] ring-1 ring-black/[0.08]"
                                 }`}
                               >
                                 {accessLabel(option)}
@@ -416,7 +416,7 @@ export default function RolesPermissionsPage() {
                 type="button"
                 onClick={closeEditor}
                 disabled={saving}
-                className="rounded-full px-4 py-2.5 text-sm font-bold text-[#8B95A5] hover:bg-[#F3F5F7] disabled:opacity-50"
+                className="rounded-full px-4 py-2.5 text-sm font-bold text-[#5B6577] hover:bg-[#d4dee9] disabled:opacity-50"
               >
                 Cancel
               </button>

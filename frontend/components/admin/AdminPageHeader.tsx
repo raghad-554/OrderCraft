@@ -14,7 +14,7 @@ export default function AdminPageHeader({
       <div>
         <h1 className="text-[1.75rem] font-bold tracking-tight text-[#0B1220]">{title}</h1>
         {description ? (
-          <p className="mt-1 text-sm font-medium text-[#8B95A5]">{description}</p>
+          <p className="mt-1 text-sm font-semibold text-[#5B6577]">{description}</p>
         ) : null}
       </div>
       {action}

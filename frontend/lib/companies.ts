@@ -1,4 +1,5 @@
 import { apiFetch } from "@/lib/api";
+import { formatOrgMoney } from "@/lib/money";
 
 export type CompanyType = "Supplier" | "Buyer" | "Both";
 export type CompanyStatus = "Active" | "PendingReview" | "Inactive";
@@ -80,13 +81,9 @@ export function listCategories() {
   return apiFetch<Category[]>("/api/Categories");
 }
 
-export function money(value?: number | null) {
+export function money(value?: number | null, currency?: string | null) {
   if (value == null) return "—";
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(value);
+  return formatOrgMoney(value, currency, 0);
 }
 
 export function statusLabel(status: CompanyStatus) {

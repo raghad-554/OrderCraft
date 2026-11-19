@@ -53,6 +53,7 @@ public class OrderResponse
     public Guid CreatedByUserId { get; set; }
     public OrderStatus Status { get; set; }
     public decimal TotalAmount { get; set; }
+    public string? Currency { get; set; }
     public decimal TaxRate { get; set; }
     public decimal TaxAmount { get; set; }
     public decimal SubtotalAmount { get; set; }

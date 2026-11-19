@@ -115,6 +115,15 @@ public class OrderService : IOrderService
             };
         }).ToList();
 
+        if (request.Direction == OrderDirection.Sale && request.Status == OrderStatus.Pending)
+        {
+            var stockError = await EnsureSaleStockAvailableAsync(
+                items.Select(i => (i.ProductId, i.Quantity)),
+                cancellationToken);
+            if (stockError is not null)
+                return (null, stockError);
+        }
+
         var taxRate = NormalizeTaxRate(request.TaxRate);
         var subtotal = items.Sum(i => i.TotalPrice);
 
@@ -129,6 +138,7 @@ public class OrderService : IOrderService
             SupplierCompanyName = resolved.SupplierCompanyName,
             CreatedByUserId = createdByUserId,
             Status = request.Status,
+            Currency = await CurrentOrgCurrencyAsync(cancellationToken),
             OrderDate = request.OrderDate ?? DateTime.UtcNow,
             DeliveryDate = NormalizeOptionalUtc(request.DeliveryDate),
             PaymentTerms = request.PaymentTerms,
@@ -252,6 +262,20 @@ public class OrderService : IOrderService
             return (null, "Change at least one field before resubmitting.");
         }
 
+        if (request.Direction == OrderDirection.Sale && nextStatus == OrderStatus.Pending)
+        {
+            var stockLines = (request.OrderItems ?? [])
+                .Select(i => (i.ProductId, i.Quantity));
+            if (request.OrderItems is null || request.OrderItems.Count == 0)
+            {
+                stockLines = order.OrderItems.Select(i => (i.ProductId, i.Quantity));
+            }
+
+            var stockError = await EnsureSaleStockAvailableAsync(stockLines, cancellationToken);
+            if (stockError is not null)
+                return (null, stockError);
+        }
+
         order.OrderNumber = request.OrderNumber.Trim();
         order.Direction = request.Direction;
         order.BuyerCompanyId = resolved.BuyerCompanyId;
@@ -336,6 +360,7 @@ public class OrderService : IOrderService
         CancellationToken cancellationToken = default)
     {
         var order = await _dbContext.Orders
+            .Include(o => o.OrderItems)
             .FirstOrDefaultAsync(o => o.Id == id, cancellationToken);
 
         if (order is null)
@@ -372,6 +397,14 @@ public class OrderService : IOrderService
 
         if (status == OrderStatus.Approved)
             order.RejectionReason = null;
+
+        var stockError = await ApplyStockForStatusChangeAsync(
+            order,
+            previous,
+            status,
+            cancellationToken);
+        if (stockError is not null)
+            return (null, stockError);
 
         order.Status = status;
         await AddFieldChangesAsync(
@@ -434,12 +467,24 @@ public class OrderService : IOrderService
     public async Task<bool> SoftDeleteAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var order = await _dbContext.Orders
+            .Include(o => o.OrderItems)
             .FirstOrDefaultAsync(o => o.Id == id, cancellationToken);
 
         if (order is null)
             return false;
 
         var orderNumber = order.OrderNumber;
+
+        // Reverse stock if this order already moved inventory (SO shipped/delivered, PO delivered).
+        if (IsStockCommitted(order.Direction, order.Status))
+        {
+            var reverseError = await AdjustProductStockAsync(
+                order,
+                reverse: true,
+                cancellationToken);
+            if (reverseError is not null)
+                return false;
+        }
 
         order.IsDeleted = true;
         order.DeletedAt = DateTime.UtcNow;
@@ -472,6 +517,103 @@ public class OrderService : IOrderService
             return;
 
         company.OrderCount = Math.Max(0, company.OrderCount + delta);
+    }
+
+    /// <summary>
+    /// PO increases stock when Delivered. SO decreases stock when Shipped (kept through Delivered).
+    /// </summary>
+    private static bool IsStockCommitted(OrderDirection direction, OrderStatus status) =>
+        direction == OrderDirection.Sale
+            ? status is OrderStatus.Shipped or OrderStatus.Delivered
+            : status == OrderStatus.Delivered;
+
+    private async Task<string?> ApplyStockForStatusChangeAsync(
+        Order order,
+        OrderStatus previous,
+        OrderStatus next,
+        CancellationToken cancellationToken)
+    {
+        var wasCommitted = IsStockCommitted(order.Direction, previous);
+        var willCommit = IsStockCommitted(order.Direction, next);
+        if (wasCommitted == willCommit)
+            return null;
+
+        return await AdjustProductStockAsync(
+            order,
+            reverse: wasCommitted && !willCommit,
+            cancellationToken);
+    }
+
+    private async Task<string?> EnsureSaleStockAvailableAsync(
+        IEnumerable<(Guid ProductId, int Quantity)> lines,
+        CancellationToken cancellationToken)
+    {
+        var qtyByProduct = lines
+            .GroupBy(l => l.ProductId)
+            .ToDictionary(g => g.Key, g => g.Sum(x => x.Quantity));
+
+        if (qtyByProduct.Count == 0)
+            return null;
+
+        var productIds = qtyByProduct.Keys.ToList();
+        var products = await _dbContext.Products
+            .AsNoTracking()
+            .Where(p => productIds.Contains(p.Id) && !p.IsDeleted)
+            .ToListAsync(cancellationToken);
+
+        if (products.Count != productIds.Count)
+            return "One or more products on this order are missing or deleted.";
+
+        foreach (var product in products)
+        {
+            var qty = qtyByProduct[product.Id];
+            if (product.StockQuantity < qty)
+            {
+                return $"Not enough stock for '{product.Name}'.";
+            }
+        }
+
+        return null;
+    }
+
+    private async Task<string?> AdjustProductStockAsync(
+        Order order,
+        bool reverse,
+        CancellationToken cancellationToken)
+    {
+        if (order.OrderItems.Count == 0)
+            return null;
+
+        var qtyByProduct = order.OrderItems
+            .GroupBy(i => i.ProductId)
+            .ToDictionary(g => g.Key, g => g.Sum(i => i.Quantity));
+
+        var productIds = qtyByProduct.Keys.ToList();
+        var products = await _dbContext.Products
+            .Where(p => productIds.Contains(p.Id) && !p.IsDeleted)
+            .ToListAsync(cancellationToken);
+
+        if (products.Count != productIds.Count)
+            return "One or more products on this order are missing or deleted.";
+
+        // Sale: decrease on commit, increase on reverse. Purchase: opposite.
+        var sign = order.Direction == OrderDirection.Sale ? -1 : 1;
+        if (reverse)
+            sign *= -1;
+
+        foreach (var product in products)
+        {
+            var qty = qtyByProduct[product.Id];
+            var nextStock = product.StockQuantity + (sign * qty);
+            if (nextStock < 0)
+            {
+                return $"Not enough stock for '{product.Name}'.";
+            }
+
+            product.StockQuantity = nextStock;
+        }
+
+        return null;
     }
 
     private async Task<string?> GetOrderNumberConflictAsync(
@@ -577,8 +719,9 @@ public class OrderService : IOrderService
             if (!selling && products.Any(p => p.CompanyId != partnerCompanyId || !p.IsActive))
                 return (null, "Each product must belong to the selected vendor and be active.");
 
-            if (selling && products.Any(p => !p.IsActive))
-                return (null, "Each product must be active.");
+            // SO: sell from your org catalog only (tenant-scoped products), must be active.
+            if (selling && products.Any(p => p.OrganizationId != orgId || !p.IsActive))
+                return (null, "Each product must be an active product from your organization catalog.");
         }
 
         return (new OrderParties(
@@ -707,4 +850,15 @@ public class OrderService : IOrderService
             item.UnitPrice,
             item.DiscountAmount,
             item.TotalPrice)).ToList();
+
+    private async Task<string> CurrentOrgCurrencyAsync(CancellationToken cancellationToken)
+    {
+        var orgId = _tenant.RequireOrganizationId();
+        var currency = await _dbContext.Organizations
+            .AsNoTracking()
+            .Where(o => o.Id == orgId)
+            .Select(o => o.DefaultCurrency)
+            .FirstOrDefaultAsync(cancellationToken);
+        return string.IsNullOrWhiteSpace(currency) ? "USD" : currency.Trim().ToUpperInvariant();
+    }
 }

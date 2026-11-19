@@ -9,9 +9,12 @@ import {
   useState,
 } from "react";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
+import ScrollSelect from "@/components/ui/ScrollSelect";
 import { ApiError } from "@/lib/api";
 import { getSession, isAdmin } from "@/lib/auth";
 import { listCategories, listCompanies, type Category, type Company } from "@/lib/companies";
+import { getOrgCurrency, setOrgCurrency, subscribeOrgCurrency } from "@/lib/money";
+import { getOrganizationSettings } from "@/lib/organizations";
 import { canEditPage } from "@/lib/permissions";
 import {
   type Product,
@@ -23,7 +26,7 @@ import {
 } from "@/lib/products";
 
 const fieldClass =
-  "w-full rounded-2xl border border-black/[0.06] bg-[#F3F5F7] px-3.5 py-2.5 text-sm font-medium text-[#0B1220] outline-none focus:bg-white focus:ring-2 focus:ring-[#051A2D]/30";
+  "w-full rounded-2xl border border-black/[0.06] bg-[#d4dee9] px-3.5 py-2.5 text-sm font-medium text-[#0B1220] outline-none focus:bg-[#e4ebf2] focus:ring-2 focus:ring-[#051A2D]/30";
 
 type FormState = {
   name: string;
@@ -70,6 +73,7 @@ export default function ProductDirectory() {
   const [products, setProducts] = useState<Product[]>([]);
   const [vendors, setVendors] = useState<Company[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [currency, setCurrency] = useState(getOrgCurrency);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -80,18 +84,25 @@ export default function ProductDirectory() {
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  useEffect(() => subscribeOrgCurrency(setCurrency), []);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [productRows, companyRows, categoryRows] = await Promise.all([
+      const [productRows, companyRows, categoryRows, settings] = await Promise.all([
         listProducts(),
         listCompanies({ types: ["Supplier", "Both"] }),
         listCategories(),
+        getOrganizationSettings().catch(() => null),
       ]);
       setProducts(productRows);
       setVendors(companyRows);
       setCategories(categoryRows);
+      if (settings?.defaultCurrency) {
+        setOrgCurrency(settings.defaultCurrency);
+        setCurrency(settings.defaultCurrency);
+      }
     } catch (err) {
       setError(
         err instanceof ApiError
@@ -239,10 +250,10 @@ export default function ProductDirectory() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by SKU or product name…"
-            className="w-full rounded-2xl border border-black/[0.06] bg-white px-4 py-2.5 text-sm font-medium text-[#0B1220] outline-none ring-[#051A2D]/30 placeholder:text-[#8B95A5] focus:ring-2"
+            className="w-full rounded-2xl border border-black/[0.06] bg-[#e4ebf2] px-4 py-2.5 text-sm font-medium text-[#0B1220] outline-none ring-[#051A2D]/30 placeholder:text-[#5B6577] focus:ring-2"
           />
         </label>
-        <p className="text-sm font-medium text-[#8B95A5]">
+        <p className="text-sm font-semibold text-[#5B6577]">
           {loading
             ? "Loading…"
             : `${filtered.length} shown${canEdit ? "" : " · view only"}`}
@@ -255,10 +266,10 @@ export default function ProductDirectory() {
         </div>
       ) : null}
 
-      <div className="overflow-hidden rounded-[24px] border border-black/[0.04] bg-white">
+      <div className="overflow-hidden rounded-[24px] border border-black/[0.04] bg-[#e4ebf2]">
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
-            <thead className="bg-[#F8FAFB] text-xs font-semibold tracking-wide text-[#8B95A5]">
+            <thead className="bg-[#e8eef4] text-xs font-semibold tracking-wide text-[#5B6577]">
               <tr>
                 <th className="px-5 py-3.5">SKU</th>
                 <th className="px-5 py-3.5">Product name</th>
@@ -272,13 +283,13 @@ export default function ProductDirectory() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-5 py-12 text-center text-[#8B95A5]">
+                  <td colSpan={7} className="px-5 py-12 text-center text-[#5B6577]">
                     Loading products…
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-5 py-12 text-center text-[#8B95A5]">
+                  <td colSpan={7} className="px-5 py-12 text-center text-[#5B6577]">
                     No products found.
                   </td>
                 </tr>
@@ -286,7 +297,7 @@ export default function ProductDirectory() {
                 filtered.map((product) => (
                   <tr
                     key={product.id}
-                    className="border-t border-black/[0.04] transition hover:bg-[#F8FAFB]"
+                    className="border-t border-black/[0.04] transition hover:bg-[#d4dee9]"
                   >
                     <td className="px-5 py-3.5 font-semibold text-[#0B1220]">
                       {product.sku}
@@ -296,7 +307,10 @@ export default function ProductDirectory() {
                       {product.categoryName || "—"}
                     </td>
                     <td className="px-5 py-3.5 font-semibold text-[#0B1220]">
-                      {formatProductMoney(Number(product.price))}
+                      {formatProductMoney(
+                        Number(product.price),
+                        product.currency || currency,
+                      )}
                     </td>
                     <td className="px-5 py-3.5 text-[#4B5563]">
                       {product.stockQuantity}
@@ -341,20 +355,20 @@ export default function ProductDirectory() {
             className="absolute inset-0 bg-[#051A2D]/55"
             onClick={closeModal}
           />
-          <div className="relative z-10 max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-[28px] bg-white p-6 shadow-2xl sm:p-7">
+          <div className="relative z-10 max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-[28px] bg-[#e4ebf2] p-6 shadow-2xl sm:p-7">
             <div className="mb-5 flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-xl font-bold text-[#0B1220]">
                   {editing ? "Edit product" : "Add product"}
                 </h2>
-                <p className="mt-1 text-sm font-medium text-[#8B95A5]">
+                <p className="mt-1 text-sm font-semibold text-[#5B6577]">
                   Products are linked to a vendor and available in Add PO line items.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={closeModal}
-                className="rounded-full px-3 py-1 text-sm font-bold text-[#8B95A5] hover:bg-[#F3F5F7]"
+                className="rounded-full px-3 py-1 text-sm font-bold text-[#5B6577] hover:bg-[#d4dee9]"
               >
                 Close
               </button>
@@ -379,19 +393,14 @@ export default function ProductDirectory() {
                   />
                 </Field>
                 <Field label="Category">
-                  <select
+                  <ScrollSelect
                     value={form.categoryId}
-                    onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))}
+                    placeholder="No category"
+                    options={categories.map((c) => ({ value: c.id, label: c.name }))}
+                    onChange={(categoryId) => setForm((f) => ({ ...f, categoryId }))}
                     className={fieldClass}
                     disabled={!canEdit}
-                  >
-                    <option value="">No category</option>
-                    {categories.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </Field>
                 <Field label="Unit price *">
                   <input
@@ -415,19 +424,14 @@ export default function ProductDirectory() {
                   />
                 </Field>
                 <Field label="Vendor *" className="sm:col-span-2">
-                  <select
+                  <ScrollSelect
                     value={form.vendorId}
-                    onChange={(e) => setForm((f) => ({ ...f, vendorId: e.target.value }))}
+                    placeholder="Select vendor"
+                    options={vendors.map((v) => ({ value: v.id, label: v.name }))}
+                    onChange={(vendorId) => setForm((f) => ({ ...f, vendorId }))}
                     className={fieldClass}
                     disabled={!canEdit}
-                  >
-                    <option value="">Select vendor</option>
-                    {vendors.map((v) => (
-                      <option key={v.id} value={v.id}>
-                        {v.name}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </Field>
                 <Field label="Description" className="sm:col-span-2">
                   <textarea
@@ -454,7 +458,7 @@ export default function ProductDirectory() {
                   type="button"
                   onClick={closeModal}
                   disabled={saving}
-                  className="rounded-full px-4 py-2.5 text-sm font-bold text-[#8B95A5] hover:bg-[#F3F5F7] disabled:opacity-50"
+                  className="rounded-full px-4 py-2.5 text-sm font-bold text-[#5B6577] hover:bg-[#d4dee9] disabled:opacity-50"
                 >
                   Cancel
                 </button>
@@ -487,7 +491,7 @@ function Field({
 }) {
   return (
     <label className={`block ${className}`}>
-      <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-[#8B95A5]">
+      <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-[#5B6577]">
         {label}
       </span>
       {children}

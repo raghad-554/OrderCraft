@@ -39,6 +39,20 @@ public static class JwtAuthenticationExtensions
 
                 options.Events = new JwtBearerEvents
                 {
+                    OnMessageReceived = context =>
+                    {
+                        // Prefer Authorization header; otherwise read HttpOnly auth cookie.
+                        if (string.IsNullOrWhiteSpace(context.Token)
+                            && context.Request.Cookies.TryGetValue(
+                                AuthCookieService.CookieName,
+                                out var cookieToken)
+                            && !string.IsNullOrWhiteSpace(cookieToken))
+                        {
+                            context.Token = cookieToken;
+                        }
+
+                        return Task.CompletedTask;
+                    },
                     OnTokenValidated = async context =>
                     {
                         var jti = context.Principal?.FindFirst(JwtRegisteredClaimNames.Jti)?.Value;

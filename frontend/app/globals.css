@@ -9,10 +9,10 @@
   --brand-deep: #030f1a;
   --accent: #2dd4a8;
   --ink: #0b1220;
-  --muted: #8b95a5;
-  --field: #f3f5f7;
-  --surface: #ffffff;
-  --admin-sheet: #f4f6f8;
+  --muted: #5b6577;
+  --field: #d4dee9;
+  --surface: #e4ebf2;
+  --admin-sheet: #c5d2e0;
 }
 
 html,
@@ -48,7 +48,7 @@ body {
 
 /* —— Login: original split layout + fluid wash + frosted form —— */
 .login-shell {
-  background: #ffffff;
+  background: linear-gradient(145deg, #041727 0%, #112a42 48%, #375068 100%);
 }
 
 .login-brand-orb {
@@ -166,14 +166,11 @@ body {
 }
 
 .login-glass {
-  background: rgba(255, 255, 255, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: #c5d2e0;
+  border: 1px solid rgba(5, 26, 45, 0.18);
   box-shadow:
-    0 8px 32px rgba(5, 26, 45, 0.12),
-    0 0 40px rgba(45, 212, 168, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.45);
+    0 8px 32px rgba(3, 15, 26, 0.35),
+    0 0 40px rgba(17, 42, 66, 0.12);
 }
 
 @keyframes login-fluid-drift {

@@ -15,7 +15,12 @@ import {
   updateSessionPermissions,
   type AuthSession,
 } from "@/lib/auth";
-import { listMyOrganizations, switchOrganization } from "@/lib/organizations";
+import {
+  getOrganizationSettings,
+  listMyOrganizations,
+  switchOrganization,
+} from "@/lib/organizations";
+import { setOrgCurrency } from "@/lib/money";
 import { ApiError } from "@/lib/api";
 import {
   canViewPage,
@@ -75,6 +80,12 @@ export default function AdminLayout({
         if (current.organization?.id) {
           const mine = await getMyPermissions();
           updateSessionPermissions(mine.permissions);
+          try {
+            const settings = await getOrganizationSettings();
+            setOrgCurrency(settings.defaultCurrency);
+          } catch {
+            // Keep cached currency if settings are unavailable.
+          }
         }
         const refreshed = getSession();
         if (!refreshed) {
@@ -147,7 +158,7 @@ export default function AdminLayout({
         <button
           type="button"
           onClick={logout}
-          className="rounded-full bg-white px-4 py-2 text-xs font-bold text-[#051A2D]"
+          className="rounded-full bg-[#e4ebf2] px-4 py-2 text-xs font-bold text-[#051A2D]"
         >
           Log out
         </button>
@@ -234,7 +245,7 @@ export default function AdminLayout({
           </div>
         ) : null}
 
-        <main className="admin-main-sheet relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-[28px] bg-[#F4F6F8] sm:rounded-[32px]">
+        <main className="admin-main-sheet relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-[28px] bg-[#c5d2e0] sm:rounded-[32px]">
           <div className="flex items-center gap-3 border-b border-black/[0.04] px-4 py-3 md:hidden">
             <button
               type="button"

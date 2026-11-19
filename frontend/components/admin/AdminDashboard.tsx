@@ -46,7 +46,7 @@ function attentionBadge(key: string) {
   if (key === "overdueInvoices" || key === "unpaidInvoices")
     return "bg-rose-100 text-rose-800";
   if (key === "openInvoices") return "bg-orange-100 text-orange-800";
-  return "bg-[#E8EEF3] text-[#051A2D]";
+  return "bg-[#e8eef4] text-[#051A2D]";
 }
 
 /** Stable mock % from user id — personal only, not other employees. */
@@ -187,14 +187,14 @@ export default function AdminDashboard() {
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
-              className="flex h-[4.5rem] w-[4.5rem] items-center justify-center overflow-hidden rounded-full border-[3px] border-[#2EC4B6] bg-[#E8F7F5] text-lg font-bold text-[#051A2D]"
+              className="flex h-[4.5rem] w-[4.5rem] items-center justify-center overflow-hidden rounded-full border-[3px] border-[#051A2D] bg-[#d4dee9] text-lg font-bold text-[#051A2D]"
               aria-label="Add profile picture"
             >
               {avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
               ) : (
-                <svg viewBox="0 0 24 24" className="h-9 w-9 text-[#2EC4B6]" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <svg viewBox="0 0 24 24" className="h-9 w-9 text-[#051A2D]" fill="none" stroke="currentColor" strokeWidth="1.5">
                   <circle cx="12" cy="8.5" r="3.2" />
                   <path strokeLinecap="round" d="M5 19c1.5-3.2 3.8-4.8 7-4.8s5.5 1.6 7 4.8" />
                 </svg>
@@ -225,7 +225,7 @@ export default function AdminDashboard() {
             <h1 className="text-2xl font-bold tracking-tight text-[#0B1220] sm:text-[1.75rem]">
               {displayName}
             </h1>
-            <p className="mt-1 text-sm font-medium text-[#8B95A5]">
+            <p className="mt-1 text-sm font-semibold text-[#5B6577]">
               {department} — {roleText}
             </p>
           </div>
@@ -233,7 +233,7 @@ export default function AdminDashboard() {
         <button
           type="button"
           onClick={() => void load()}
-          className="rounded-full border border-black/[0.08] bg-white px-4 py-2 text-sm font-bold text-[#051A2D] hover:bg-[#F8FAFB]"
+          className="rounded-full border border-black/[0.08] bg-[#e4ebf2] px-4 py-2 text-sm font-bold text-[#051A2D] hover:bg-[#d4dee9]"
         >
           Refresh
         </button>
@@ -247,16 +247,16 @@ export default function AdminDashboard() {
 
       {/* Same 3-column shape for admin & employees */}
       <div className="grid gap-4 xl:grid-cols-12">
-        <section className="rounded-[22px] border border-black/[0.04] bg-white p-4 xl:col-span-3">
+        <section className="rounded-[22px] border border-black/[0.04] bg-[#e4ebf2] p-4 xl:col-span-3">
           <h2 className="text-sm font-bold text-[#0B1220]">Needs attention</h2>
-          <p className="mt-0.5 text-xs font-medium text-[#8B95A5]">{attentionSubtitle}</p>
+          <p className="mt-0.5 text-xs font-semibold text-[#5B6577]">{attentionSubtitle}</p>
           <div className="mt-4 space-y-2">
             {loading ? (
               [0, 1, 2].map((i) => (
-                <div key={i} className="h-11 animate-pulse rounded-xl bg-[#F3F5F7]" />
+                <div key={i} className="h-11 animate-pulse rounded-xl bg-[#d4dee9]" />
               ))
             ) : !attention.length ? (
-              <p className="rounded-xl bg-[#F8FAFB] px-3 py-6 text-center text-xs font-medium text-[#8B95A5]">
+              <p className="rounded-xl bg-[#e8eef4] px-3 py-6 text-center text-xs font-semibold text-[#5B6577]">
                 Nothing urgent right now.
               </p>
             ) : (
@@ -264,7 +264,7 @@ export default function AdminDashboard() {
                 <Link
                   key={item.key}
                   href={item.href}
-                  className="flex items-center justify-between gap-2 rounded-xl bg-[#F8FAFB] px-3 py-2.5 transition hover:bg-[#F0F3F6]"
+                  className="flex items-center justify-between gap-2 rounded-xl border border-transparent bg-[#e8eef4] px-3 py-2.5 transition hover:border-[#051A2D]/20 hover:bg-[#d4dee9]"
                 >
                   <span className="text-xs font-semibold text-[#0B1220]">{item.label}</span>
                   <span
@@ -278,9 +278,9 @@ export default function AdminDashboard() {
           </div>
         </section>
 
-        <section className="rounded-[22px] border border-black/[0.04] bg-white p-4 xl:col-span-5">
+        <section className="rounded-[22px] border border-black/[0.04] bg-[#e4ebf2] p-4 xl:col-span-5">
           <h2 className="text-sm font-bold text-[#0B1220]">Overview</h2>
-          <p className="mt-0.5 text-xs font-medium text-[#8B95A5]">{overviewSubtitle}</p>
+          <p className="mt-0.5 text-xs font-semibold text-[#5B6577]">{overviewSubtitle}</p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             {admin ? (
               <>
@@ -416,13 +416,13 @@ export default function AdminDashboard() {
         </section>
 
         {/* Admin: recent activity · Employees: personal time only */}
-        <section className="rounded-[22px] border border-black/[0.04] bg-white p-4 xl:col-span-4">
+        <section className="rounded-[22px] border border-black/[0.04] bg-[#e4ebf2] p-4 xl:col-span-4">
           {admin ? (
             <>
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <h2 className="text-sm font-bold text-[#0B1220]">Recent activity</h2>
-                  <p className="mt-0.5 text-xs font-medium text-[#8B95A5]">Latest actions</p>
+                  <p className="mt-0.5 text-xs font-semibold text-[#5B6577]">Latest actions</p>
                 </div>
                 {canViewAudit ? (
                   <Link
@@ -435,22 +435,22 @@ export default function AdminDashboard() {
               </div>
               <ul className="mt-3 max-h-[18rem] space-y-2 overflow-y-auto">
                 {!canViewAudit ? (
-                  <li className="py-8 text-center text-xs font-medium text-[#8B95A5]">
+                  <li className="py-8 text-center text-xs font-semibold text-[#5B6577]">
                     Audit access required.
                   </li>
                 ) : loading ? (
                   [0, 1, 2, 3].map((i) => (
-                    <li key={i} className="h-12 animate-pulse rounded-xl bg-[#F3F5F7]" />
+                    <li key={i} className="h-12 animate-pulse rounded-xl bg-[#d4dee9]" />
                   ))
                 ) : !data?.recentActivity.length ? (
-                  <li className="py-8 text-center text-xs font-medium text-[#8B95A5]">
+                  <li className="py-8 text-center text-xs font-semibold text-[#5B6577]">
                     No activity yet.
                   </li>
                 ) : (
                   data.recentActivity.map((row) => (
                     <li
                       key={row.id}
-                      className="flex items-start gap-2.5 rounded-xl bg-[#F8FAFB] px-3 py-2.5"
+                      className="flex items-start gap-2.5 rounded-xl border border-transparent bg-[#e8eef4] px-3 py-2.5 transition hover:border-[#051A2D]/20 hover:bg-[#d4dee9]"
                     >
                       <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#051A2D] text-[10px] font-bold text-white">
                         {initials(row.actorName)}
@@ -461,7 +461,7 @@ export default function AdminDashboard() {
                             ? `${row.entityType}: ${row.entityLabel}`
                             : row.entityType}
                         </p>
-                        <p className="mt-0.5 truncate text-[10px] font-medium text-[#8B95A5]">
+                        <p className="mt-0.5 truncate text-[10px] font-semibold text-[#5B6577]">
                           {row.actorName}
                           {row.summary
                             ? ` · ${row.summary.replace(/^\[demo\]\s*/i, "")}`
@@ -474,7 +474,7 @@ export default function AdminDashboard() {
                         >
                           {actionLabel(row.action)}
                         </span>
-                        <p className="mt-1 text-[9px] font-medium text-[#8B95A5]">
+                        <p className="mt-1 text-[9px] font-semibold text-[#5B6577]">
                           {formatAuditWhen(row.createdAt)}
                         </p>
                       </div>
@@ -486,16 +486,16 @@ export default function AdminDashboard() {
           ) : (
             <>
               <h2 className="text-sm font-bold text-[#0B1220]">My time today</h2>
-              <p className="mt-0.5 text-xs font-medium text-[#8B95A5]">
+              <p className="mt-0.5 text-xs font-semibold text-[#5B6577]">
                 Your share of the workday · preview only
               </p>
               <div className="mt-4 flex flex-col items-center">
                 <ProgressRing percent={myTimePercent} />
                 <p className="mt-3 text-sm font-bold text-[#0B1220]">{displayName}</p>
-                <p className="mt-1 text-xs font-medium text-[#8B95A5]">
+                <p className="mt-1 text-xs font-semibold text-[#5B6577]">
                   About {hoursUsed}h of an 8h day (sample)
                 </p>
-                <p className="mt-3 text-center text-[10px] font-medium text-[#8B95A5]">
+                <p className="mt-3 text-center text-[10px] font-semibold text-[#5B6577]">
                   Only your time is shown — live tracking comes later.
                 </p>
               </div>
@@ -507,7 +507,7 @@ export default function AdminDashboard() {
       {/* Bottom row — same shape; actions differ by role */}
       <div className="grid gap-4 lg:grid-cols-12">
         {canOrders ? (
-          <section className="rounded-[22px] border border-black/[0.04] bg-white p-4 lg:col-span-5">
+          <section className="rounded-[22px] border border-black/[0.04] bg-[#e4ebf2] p-4 lg:col-span-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h2 className="text-sm font-bold text-[#0B1220]">
@@ -515,21 +515,21 @@ export default function AdminDashboard() {
                     ? "Sales volume this year"
                     : "Purchase volume this year"}
                 </h2>
-                <p className="mt-0.5 text-xs font-medium text-[#8B95A5]">
+                <p className="mt-0.5 text-xs font-semibold text-[#5B6577]">
                   {volumeMode === "sales"
                     ? "Sale orders · last 12 months"
                     : "Purchase orders · last 12 months"}
                 </p>
               </div>
               {admin || finance ? (
-                <div className="inline-flex rounded-full border border-black/[0.08] bg-[#F8FAFB] p-0.5">
+                <div className="inline-flex rounded-full border border-black/[0.08] bg-[#e8eef4] p-0.5">
                   <button
                     type="button"
                     onClick={() => setVolumeMode("sales")}
                     className={`rounded-full px-3 py-1.5 text-[11px] font-bold transition ${
                       volumeMode === "sales"
-                        ? "bg-[#7B61FF] text-white"
-                        : "text-[#8B95A5] hover:text-[#0B1220]"
+                        ? "bg-[#134066] text-white"
+                        : "text-[#5B6577] hover:text-[#0B1220]"
                     }`}
                   >
                     Sales
@@ -539,8 +539,8 @@ export default function AdminDashboard() {
                     onClick={() => setVolumeMode("purchase")}
                     className={`rounded-full px-3 py-1.5 text-[11px] font-bold transition ${
                       volumeMode === "purchase"
-                        ? "bg-[#2EC4B6] text-white"
-                        : "text-[#8B95A5] hover:text-[#0B1220]"
+                        ? "bg-[#051A2D] text-white"
+                        : "text-[#5B6577] hover:text-[#0B1220]"
                     }`}
                   >
                     Purchase
@@ -553,11 +553,11 @@ export default function AdminDashboard() {
               loading={loading}
               mode={volumeMode}
             />
-            <div className="mt-3 flex gap-4 text-[10px] font-bold uppercase tracking-wide text-[#8B95A5]">
+            <div className="mt-3 flex gap-4 text-[10px] font-bold uppercase tracking-wide text-[#5B6577]">
               <span className="inline-flex items-center gap-1.5">
                 <span
                   className={`h-2 w-2 rounded-full ${
-                    volumeMode === "sales" ? "bg-[#7B61FF]" : "bg-[#2EC4B6]"
+                    volumeMode === "sales" ? "bg-[#134066]" : "bg-[#051A2D]"
                   }`}
                 />
                 {volumeMode === "sales" ? "Sales" : "Purchase"}
@@ -565,19 +565,19 @@ export default function AdminDashboard() {
             </div>
           </section>
         ) : (
-          <section className="rounded-[22px] border border-black/[0.04] bg-white p-4 lg:col-span-5">
+          <section className="rounded-[22px] border border-black/[0.04] bg-[#e4ebf2] p-4 lg:col-span-5">
             <h2 className="text-sm font-bold text-[#0B1220]">Volume chart</h2>
-            <p className="mt-6 py-10 text-center text-xs font-medium text-[#8B95A5]">
+            <p className="mt-6 py-10 text-center text-xs font-semibold text-[#5B6577]">
               Order access is required to view volume charts.
             </p>
           </section>
         )}
 
-        <section className="rounded-[22px] border border-black/[0.04] bg-white p-4 lg:col-span-4">
+        <section className="rounded-[22px] border border-black/[0.04] bg-[#e4ebf2] p-4 lg:col-span-4">
           <h2 className="text-sm font-bold text-[#0B1220]">
             {admin || finance ? "Payment progress" : "Fulfillment progress"}
           </h2>
-          <p className="mt-0.5 text-xs font-medium text-[#8B95A5]">
+          <p className="mt-0.5 text-xs font-semibold text-[#5B6577]">
             {admin || finance
               ? "Share of invoices fully paid"
               : "Share of orders approved or beyond"}
@@ -587,7 +587,7 @@ export default function AdminDashboard() {
             <div className="mt-4 w-full max-w-[14rem] space-y-1.5 text-left text-xs">
               {(admin || procurement || (employee && !finance)) && (
                 <div className="grid grid-cols-[5.5rem_minmax(0,1fr)] items-baseline gap-x-2">
-                  <span className="font-medium text-[#8B95A5]">Top vendor</span>
+                  <span className="font-semibold text-[#5B6577]">Top vendor</span>
                   <span className="truncate font-bold text-[#0B1220]">
                     {data?.topVendorName || "—"}
                   </span>
@@ -595,7 +595,7 @@ export default function AdminDashboard() {
               )}
               {(admin || finance) && (
                 <div className="grid grid-cols-[5.5rem_minmax(0,1fr)] items-baseline gap-x-2">
-                  <span className="font-medium text-[#8B95A5]">Top client</span>
+                  <span className="font-semibold text-[#5B6577]">Top client</span>
                   <span className="truncate font-bold text-[#0B1220]">
                     {data?.topClientName || "—"}
                   </span>
@@ -605,9 +605,9 @@ export default function AdminDashboard() {
           </div>
         </section>
 
-        <section className="flex flex-col rounded-[22px] border border-black/[0.04] bg-white p-4 lg:col-span-3">
+        <section className="flex flex-col justify-start rounded-[22px] border border-black/[0.04] bg-[#e4ebf2] p-4 lg:col-span-3">
           <h2 className="text-sm font-bold text-[#0B1220]">Quick actions</h2>
-          <p className="mt-0.5 text-xs font-medium text-[#8B95A5]">
+          <p className="mt-0.5 text-xs font-semibold text-[#5B6577]">
             {finance
               ? "Finance actions"
               : procurement
@@ -616,7 +616,7 @@ export default function AdminDashboard() {
                   ? "Admin actions"
                   : "Your department actions"}
           </p>
-          <div className="mt-3 flex flex-col gap-2">
+          <div className="mt-3 flex flex-1 flex-col justify-start gap-4">
             {admin ? (
               <>
                 {canCreateOrder ? (
@@ -626,14 +626,14 @@ export default function AdminDashboard() {
                   <QuickAction href="/admin/companies" label="Add company" />
                 ) : null}
                 {canCreateInvoice ? (
-                  <QuickAction href="/admin/invoices?create=1" label="New invoice" accent />
+                  <QuickAction href="/admin/invoices?create=1" label="New invoice" />
                 ) : null}
               </>
             ) : null}
 
             {finance ? (
               <>
-                <QuickAction href="/admin/invoices?create=1" label="New invoice" accent />
+                <QuickAction href="/admin/invoices?create=1" label="New invoice" />
                 <QuickAction href="/admin/invoices?status=Open" label="Open invoices" />
                 <QuickAction href="/admin/invoices?status=Overdue" label="Overdue invoices" />
               </>
@@ -667,7 +667,7 @@ export default function AdminDashboard() {
             !canCreateOrder &&
             !canCreateCompany &&
             !canCreateInvoice ? (
-              <p className="py-6 text-center text-xs font-medium text-[#8B95A5]">
+              <p className="py-6 text-center text-xs font-semibold text-[#5B6577]">
                 No create permissions.
               </p>
             ) : null}
@@ -698,20 +698,20 @@ function OverviewCard({
   return (
     <Link
       href={href}
-      className="rounded-2xl border border-black/[0.05] bg-[#F8FAFB] px-3.5 py-3 transition hover:border-[#051A2D]/15 hover:bg-white"
+      className="rounded-2xl border border-black/[0.05] bg-[#e8eef4] px-3.5 py-3 transition hover:border-[#051A2D]/25 hover:bg-[#d4dee9]"
     >
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-[#8B95A5]">
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-[#5B6577]">
         {label}
       </p>
       <p className="mt-1 text-2xl font-bold text-[#0B1220]">{value}</p>
       <div className="mt-1 flex items-center justify-between gap-2">
-        <p className="truncate text-[10px] font-medium text-[#8B95A5]">
+        <p className="truncate text-[10px] font-semibold text-[#5B6577]">
           {moneyHint ?? " "}
         </p>
         {delta ? (
           <span
             className={`shrink-0 text-[10px] font-bold ${
-              up ? "text-emerald-600" : down ? "text-rose-600" : "text-[#8B95A5]"
+              up ? "text-emerald-600" : down ? "text-rose-600" : "text-[#5B6577]"
             }`}
           >
             {delta}
@@ -725,23 +725,17 @@ function OverviewCard({
 function QuickAction({
   href,
   label,
-  accent,
 }: {
   href: string;
   label: string;
-  accent?: boolean;
 }) {
   return (
     <Link
       href={href}
-      className={`flex items-center justify-center gap-2 rounded-2xl px-4 py-3.5 text-center text-xs font-bold uppercase tracking-wide transition ${
-        accent
-          ? "bg-gradient-to-r from-[#051A2D] to-[#2EC4B6] text-white hover:opacity-95"
-          : "bg-[#051A2D] text-white hover:bg-[#0a2a45]"
-      }`}
+      className="flex items-center justify-start gap-2 rounded-2xl bg-[#051A2D] px-5 py-4 text-left text-xs font-bold uppercase leading-relaxed tracking-wide text-white transition hover:bg-[#0a2a45]"
     >
-      <span className="text-base leading-none">+</span>
-      {label}
+      <span className="w-4 shrink-0 text-center text-sm leading-relaxed">+</span>
+      <span className="leading-relaxed">{label}</span>
     </Link>
   );
 }
@@ -755,13 +749,13 @@ function ProgressRing({ percent }: { percent: number }) {
   return (
     <div className="relative h-36 w-36">
       <svg viewBox="0 0 140 140" className="h-full w-full -rotate-90">
-        <circle cx="70" cy="70" r={r} fill="none" stroke="#E8EEF3" strokeWidth="12" />
+        <circle cx="70" cy="70" r={r} fill="none" stroke="#e8eef4" strokeWidth="12" />
         <circle
           cx="70"
           cy="70"
           r={r}
           fill="none"
-          stroke="#2EC4B6"
+          stroke="#051A2D"
           strokeWidth="12"
           strokeLinecap="round"
           strokeDasharray={c}
@@ -770,7 +764,7 @@ function ProgressRing({ percent }: { percent: number }) {
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <p className="text-2xl font-bold text-[#0B1220]">{Math.round(p)}%</p>
-        <p className="text-[10px] font-bold uppercase tracking-wide text-[#8B95A5]">
+        <p className="text-[10px] font-bold uppercase tracking-wide text-[#5B6577]">
           Progress
         </p>
       </div>
@@ -788,7 +782,7 @@ function MonthlyVolumeChart({
   mode: VolumeMode;
 }) {
   if (loading) {
-    return <div className="mt-6 h-40 animate-pulse rounded-xl bg-[#F3F5F7]" />;
+    return <div className="mt-6 h-40 animate-pulse rounded-xl bg-[#d4dee9]" />;
   }
 
   const values = points.map((p) =>
@@ -799,7 +793,7 @@ function MonthlyVolumeChart({
   const gap = 10;
   const n = Math.max(points.length, 1);
   const barW = Math.max(10, Math.min(22, (320 - gap * n) / n));
-  const color = mode === "sales" ? "#7B61FF" : "#2EC4B6";
+  const color = mode === "sales" ? "#134066" : "#051A2D";
 
   return (
     <div className="mt-4 overflow-x-auto">
@@ -832,7 +826,7 @@ function MonthlyVolumeChart({
                 x={x + barW / 2}
                 y={h + 16}
                 textAnchor="middle"
-                className="fill-[#8B95A5]"
+                className="fill-[#5B6577]"
                 fontSize="9"
                 fontWeight="600"
               >

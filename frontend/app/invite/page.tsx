@@ -81,9 +81,9 @@ function InviteAcceptInner() {
   }
 
   return (
-    <main className="min-h-screen bg-[#F3F5F7] px-4 py-16">
-      <div className="mx-auto w-full max-w-lg rounded-[28px] border border-black/[0.04] bg-white p-8 shadow-sm">
-        <p className="text-xs font-bold uppercase tracking-wide text-[#8B95A5]">
+    <main className="min-h-screen bg-[#d4dee9] px-4 py-16">
+      <div className="mx-auto w-full max-w-lg rounded-[28px] border border-black/[0.04] bg-[#e4ebf2] p-8 shadow-sm">
+        <p className="text-xs font-bold uppercase tracking-wide text-[#5B6577]">
           OrderCraft
         </p>
         <h1 className="mt-2 text-2xl font-bold text-[#0B1220]">
@@ -139,36 +139,36 @@ function InviteAcceptInner() {
               Create your account for the invited email, then join the organization.
             </p>
             <label className="block">
-              <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-[#8B95A5]">
+              <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-[#5B6577]">
                 Username
               </span>
               <input
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full rounded-2xl border border-black/[0.06] bg-[#F3F5F7] px-3.5 py-2.5 text-sm"
+                className="w-full rounded-2xl border border-black/[0.06] bg-[#d4dee9] px-3.5 py-2.5 text-sm"
                 required
               />
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-[#8B95A5]">
+              <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-[#5B6577]">
                 Full name
               </span>
               <input
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                className="w-full rounded-2xl border border-black/[0.06] bg-[#F3F5F7] px-3.5 py-2.5 text-sm"
+                className="w-full rounded-2xl border border-black/[0.06] bg-[#d4dee9] px-3.5 py-2.5 text-sm"
                 required
               />
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-[#8B95A5]">
+              <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-[#5B6577]">
                 Password
               </span>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-2xl border border-black/[0.06] bg-[#F3F5F7] px-3.5 py-2.5 text-sm"
+                className="w-full rounded-2xl border border-black/[0.06] bg-[#d4dee9] px-3.5 py-2.5 text-sm"
                 minLength={6}
                 required
               />
@@ -184,7 +184,7 @@ function InviteAcceptInner() {
         ) : null}
 
         {token && session?.token ? (
-          <p className="mt-6 text-sm text-[#8B95A5]">
+          <p className="mt-6 text-sm text-[#5B6577]">
             {busy ? "Accepting invitation…" : "Signed in — accepting invitation…"}
           </p>
         ) : null}
@@ -197,7 +197,7 @@ export default function InvitePage() {
   return (
     <Suspense
       fallback={
-        <main className="min-h-screen bg-[#F3F5F7] px-4 py-16 text-center text-sm text-[#8B95A5]">
+        <main className="min-h-screen bg-[#d4dee9] px-4 py-16 text-center text-sm text-[#5B6577]">
           Loading invite…
         </main>
       }

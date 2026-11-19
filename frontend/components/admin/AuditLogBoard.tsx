@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
+import ScrollSelect from "@/components/ui/ScrollSelect";
 import { ApiError } from "@/lib/api";
 import {
   type AuditLog,
@@ -128,7 +129,7 @@ export default function AuditLogBoard() {
           <button
             type="button"
             onClick={() => void load()}
-            className="rounded-full border border-black/[0.08] bg-white px-4 py-2.5 text-sm font-bold text-[#051A2D] hover:bg-[#F8FAFB]"
+            className="rounded-full border border-black/[0.08] bg-[#e4ebf2] px-4 py-2.5 text-sm font-bold text-[#051A2D] hover:bg-[#d4dee9]"
           >
             Refresh
           </button>
@@ -143,14 +144,14 @@ export default function AuditLogBoard() {
       </div>
 
       {selectedEmployee ? (
-        <div className="mb-4 rounded-[22px] border border-black/[0.04] bg-white px-5 py-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#8B95A5]">
+        <div className="mb-4 rounded-[22px] border border-black/[0.04] bg-[#e4ebf2] px-5 py-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[#5B6577]">
             Tracking
           </p>
           <p className="mt-1 text-lg font-bold text-[#0B1220]">
             {selectedEmployee.fullName}
           </p>
-          <p className="mt-0.5 text-sm font-medium text-[#8B95A5]">
+          <p className="mt-0.5 text-sm font-semibold text-[#5B6577]">
             {selectedEmployee.username} · {roleLabel(selectedEmployee.role)}
             {selectedEmployee.department ? ` · ${selectedEmployee.department}` : ""}
             {selectedEmployee.isActive ? "" : " · Inactive"}
@@ -161,33 +162,29 @@ export default function AuditLogBoard() {
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <label className="min-w-[220px] flex-1">
           <span className="sr-only">Employee</span>
-          <select
-            value={employeeId}
-            onChange={(e) => selectEmployee(e.target.value)}
-            className="w-full rounded-2xl border border-black/[0.06] bg-white px-4 py-2.5 text-sm font-bold text-[#051A2D] outline-none focus:ring-2 focus:ring-[#051A2D]/30"
-          >
-            <option value="All">All employees</option>
-            {employees.map((employee) => (
-              <option key={employee.id} value={employee.id}>
-                {employee.fullName} ({employee.username})
-              </option>
-            ))}
-          </select>
+          <ScrollSelect
+            value={employeeId === "All" ? "" : employeeId}
+            placeholder="All employees"
+            options={employees.map((employee) => ({
+              value: employee.id,
+              label: `${employee.fullName} (${employee.username})`,
+            }))}
+            onChange={(next) => selectEmployee(next || "All")}
+            className="w-full rounded-2xl border border-black/[0.06] bg-[#e4ebf2] px-4 py-2.5 text-sm font-bold text-[#051A2D] outline-none focus:ring-2 focus:ring-[#051A2D]/30"
+          />
         </label>
-        <label className="shrink-0">
+        <label className="min-w-[180px] shrink-0">
           <span className="sr-only">Action</span>
-          <select
-            value={action}
-            onChange={(e) => setAction(e.target.value)}
-            className="rounded-2xl border border-black/[0.06] bg-white px-4 py-2.5 text-sm font-bold text-[#051A2D] outline-none focus:ring-2 focus:ring-[#051A2D]/30"
-          >
-            <option value="All">All actions</option>
-            {AUDIT_ACTIONS.map((item) => (
-              <option key={item} value={item}>
-                {actionLabel(item)}
-              </option>
-            ))}
-          </select>
+          <ScrollSelect
+            value={action === "All" ? "" : action}
+            placeholder="All actions"
+            options={AUDIT_ACTIONS.map((item) => ({
+              value: item,
+              label: actionLabel(item),
+            }))}
+            onChange={(next) => setAction(next || "All")}
+            className="rounded-2xl border border-black/[0.06] bg-[#e4ebf2] px-4 py-2.5 text-sm font-bold text-[#051A2D] outline-none focus:ring-2 focus:ring-[#051A2D]/30"
+          />
         </label>
         <label className="relative min-w-[200px] flex-1">
           <span className="sr-only">Search</span>
@@ -195,10 +192,10 @@ export default function AuditLogBoard() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search summary, request id, or related item…"
-            className="w-full rounded-2xl border border-black/[0.06] bg-white px-4 py-2.5 text-sm font-medium text-[#0B1220] outline-none ring-[#051A2D]/30 placeholder:text-[#8B95A5] focus:ring-2"
+            className="w-full rounded-2xl border border-black/[0.06] bg-[#e4ebf2] px-4 py-2.5 text-sm font-medium text-[#0B1220] outline-none ring-[#051A2D]/30 placeholder:text-[#5B6577] focus:ring-2"
           />
         </label>
-        <p className="text-sm font-medium text-[#8B95A5]">
+        <p className="text-sm font-semibold text-[#5B6577]">
           {loading ? "Loading…" : `${filtered.length} events · view only`}
         </p>
       </div>
@@ -209,10 +206,10 @@ export default function AuditLogBoard() {
         </div>
       ) : null}
 
-      <div className="overflow-hidden rounded-[24px] border border-black/[0.04] bg-white">
+      <div className="overflow-hidden rounded-[24px] border border-black/[0.04] bg-[#e4ebf2]">
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
-            <thead className="bg-[#F8FAFB] text-xs font-semibold tracking-wide text-[#8B95A5]">
+            <thead className="bg-[#e8eef4] text-xs font-semibold tracking-wide text-[#5B6577]">
               <tr>
                 <th className="px-5 py-3.5">When</th>
                 <th className="px-5 py-3.5">Employee</th>
@@ -225,13 +222,13 @@ export default function AuditLogBoard() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-5 py-12 text-center text-[#8B95A5]">
+                  <td colSpan={6} className="px-5 py-12 text-center text-[#5B6577]">
                     Loading audit log…
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-5 py-12 text-center text-[#8B95A5]">
+                  <td colSpan={6} className="px-5 py-12 text-center text-[#5B6577]">
                     {employeeId === "All"
                       ? "No activity yet. Sign in, edit an employee, or change permissions to start tracking."
                       : "No activity for this employee yet."}
@@ -248,7 +245,7 @@ export default function AuditLogBoard() {
                   return (
                     <tr
                       key={row.id}
-                      className="border-t border-black/[0.04] transition hover:bg-[#F8FAFB]"
+                      className="border-t border-black/[0.04] transition hover:bg-[#d4dee9]"
                     >
                       <td className="whitespace-nowrap px-5 py-3.5 text-[#4B5563]">
                         {formatAuditWhen(row.createdAt)}
@@ -286,7 +283,7 @@ function RequestIdChip({ requestId }: { requestId?: string | null }) {
   const [copied, setCopied] = useState(false);
 
   if (!requestId) {
-    return <span className="text-[#8B95A5]">—</span>;
+    return <span className="text-[#5B6577]">—</span>;
   }
 
   const short =
@@ -307,7 +304,7 @@ function RequestIdChip({ requestId }: { requestId?: string | null }) {
       type="button"
       title={copied ? "Copied" : `Copy request id\n${requestId}`}
       onClick={copy}
-      className="inline-flex max-w-[9.5rem] items-center rounded-md border border-black/[0.06] bg-[#F8FAFB] px-2 py-1 font-mono text-[11px] text-[#4B5563] transition hover:border-black/[0.12] hover:bg-white"
+      className="inline-flex max-w-[9.5rem] items-center rounded-md border border-black/[0.06] bg-[#e8eef4] px-2 py-1 font-mono text-[11px] text-[#4B5563] transition hover:border-black/[0.12] hover:bg-[#e4ebf2]"
     >
       {copied ? "Copied" : short}
     </button>
@@ -316,8 +313,8 @@ function RequestIdChip({ requestId }: { requestId?: string | null }) {
 
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[22px] border border-black/[0.04] bg-white px-5 py-4">
-      <p className="text-xs font-semibold uppercase tracking-wide text-[#8B95A5]">{label}</p>
+    <div className="rounded-[22px] border border-black/[0.04] bg-[#e4ebf2] px-5 py-4">
+      <p className="text-xs font-semibold uppercase tracking-wide text-[#5B6577]">{label}</p>
       <p className="mt-1 text-xl font-bold text-[#0B1220]">{value}</p>
     </div>
   );

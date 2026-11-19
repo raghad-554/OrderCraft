@@ -74,6 +74,20 @@ public class ApplicationDbContext : DbContext
             entity.Property(o => o.IsActive).IsRequired().HasDefaultValue(true);
             entity.Property(o => o.ContactEmail).HasMaxLength(256);
             entity.Property(o => o.ContactPhone).HasMaxLength(20);
+            entity.Property(o => o.LogoUrl).HasMaxLength(500);
+            entity.Property(o => o.DefaultCurrency)
+                .IsRequired()
+                .HasMaxLength(3)
+                .HasDefaultValue("USD");
+            entity.Property(o => o.DefaultTaxRate)
+                .IsRequired()
+                .HasColumnType("numeric(5,2)")
+                .HasDefaultValue(0m);
+            entity.Property(o => o.DefaultPaymentTerms)
+                .IsRequired()
+                .HasConversion<string>()
+                .HasMaxLength(20)
+                .HasDefaultValue(PaymentTerms.Net30);
             entity.Property(o => o.EnabledPageKeys).IsRequired().HasMaxLength(2000).HasDefaultValue("");
             entity.Property(o => o.ApprovalThreshold)
                 .IsRequired()
@@ -455,6 +469,9 @@ public class ApplicationDbContext : DbContext
                 .IsRequired()
                 .HasColumnType("numeric(18,2)");
 
+            entity.Property(p => p.Currency)
+                .HasMaxLength(3);
+
             entity.Property(p => p.StockQuantity)
                 .IsRequired();
 
@@ -517,6 +534,9 @@ public class ApplicationDbContext : DbContext
             entity.Property(o => o.TotalAmount)
                 .IsRequired()
                 .HasColumnType("numeric(18,2)");
+
+            entity.Property(o => o.Currency)
+                .HasMaxLength(3);
 
             entity.Property(o => o.OrderDate)
                 .IsRequired()

@@ -16,6 +16,8 @@ namespace OrderCraft.Services;
 /// Pending / Approved / Shipped / Delivered / Cancelled are not editable.
 /// SoD: a non-admin creator cannot Pending → Approved. Org Admin may. Enforced in OrderService.
 /// RejectionReason is required on Pending → Rejected, kept until Approved, then cleared.
+/// Stock (OrderService): Sale decreases StockQuantity on Shipped (held through Delivered).
+/// Purchase increases StockQuantity on Delivered. Soft-delete reverses committed stock.
 /// </summary>
 public static class OrderStateMachine
 {

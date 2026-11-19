@@ -10,6 +10,7 @@ import {
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
+import ScrollSelect from "@/components/ui/ScrollSelect";
 import { ApiError } from "@/lib/api";
 import { getSession, isAdmin } from "@/lib/auth";
 import {
@@ -37,7 +38,7 @@ import {
 import { canEditPage } from "@/lib/permissions";
 
 const fieldClass =
-  "w-full rounded-2xl border border-black/[0.06] bg-[#F3F5F7] px-3.5 py-2.5 text-sm font-medium text-[#0B1220] outline-none focus:bg-white focus:ring-2 focus:ring-[#051A2D]/30";
+  "w-full rounded-2xl border border-black/[0.06] bg-[#d4dee9] px-3.5 py-2.5 text-sm font-medium text-[#0B1220] outline-none focus:bg-[#e4ebf2] focus:ring-2 focus:ring-[#051A2D]/30";
 
 type FormState = {
   orderId: string;
@@ -412,30 +413,30 @@ export default function InvoiceDirectory() {
               syncInvoiceFilters(next, statusFilter);
             }}
             placeholder="Search by invoice #, order, buyer, or vendor…"
-            className="w-full rounded-2xl border border-black/[0.06] bg-white px-4 py-2.5 text-sm font-medium text-[#0B1220] outline-none ring-[#051A2D]/30 placeholder:text-[#8B95A5] focus:ring-2"
+            className="w-full rounded-2xl border border-black/[0.06] bg-[#e4ebf2] px-4 py-2.5 text-sm font-medium text-[#0B1220] outline-none ring-[#051A2D]/30 placeholder:text-[#5B6577] focus:ring-2"
           />
         </label>
-        <label className="shrink-0">
+        <label className="min-w-[160px] shrink-0">
           <span className="sr-only">Filter by status</span>
-          <select
-            value={statusFilter}
-            onChange={(e) => {
-              const next = e.target.value as InvoiceStatusFilter;
-              setStatusFilter(next);
-              syncInvoiceFilters(search, next);
+          <ScrollSelect
+            value={statusFilter === "All" ? "" : statusFilter}
+            placeholder="All statuses"
+            options={[
+              { value: "Open", label: "Open" },
+              ...INVOICE_STATUSES.map((status) => ({
+                value: status,
+                label: invoiceStatusLabel(status),
+              })),
+            ]}
+            onChange={(next) => {
+              const value = (next || "All") as InvoiceStatusFilter;
+              setStatusFilter(value);
+              syncInvoiceFilters(search, value);
             }}
-            className="rounded-2xl border border-black/[0.06] bg-white px-4 py-2.5 text-sm font-bold text-[#051A2D] outline-none focus:ring-2 focus:ring-[#051A2D]/30"
-          >
-            <option value="All">All statuses</option>
-            <option value="Open">Open</option>
-            {INVOICE_STATUSES.map((status) => (
-              <option key={status} value={status}>
-                {invoiceStatusLabel(status)}
-              </option>
-            ))}
-          </select>
+            className="rounded-2xl border border-black/[0.06] bg-[#e4ebf2] px-4 py-2.5 text-sm font-bold text-[#051A2D] outline-none focus:ring-2 focus:ring-[#051A2D]/30"
+          />
         </label>
-        <p className="text-sm font-medium text-[#8B95A5]">
+        <p className="text-sm font-semibold text-[#5B6577]">
           {loading
             ? "Loading…"
             : `${filtered.length} shown${canEdit ? "" : " · view only"}`}
@@ -448,10 +449,10 @@ export default function InvoiceDirectory() {
         </div>
       ) : null}
 
-      <div className="overflow-hidden rounded-[24px] border border-black/[0.04] bg-white">
+      <div className="overflow-hidden rounded-[24px] border border-black/[0.04] bg-[#e4ebf2]">
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
-            <thead className="bg-[#F8FAFB] text-xs font-semibold tracking-wide text-[#8B95A5]">
+            <thead className="bg-[#e8eef4] text-xs font-semibold tracking-wide text-[#5B6577]">
               <tr>
                 <th className="px-5 py-3.5">Invoice #</th>
                 <th className="px-5 py-3.5">Order</th>
@@ -468,13 +469,13 @@ export default function InvoiceDirectory() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={10} className="px-5 py-12 text-center text-[#8B95A5]">
+                  <td colSpan={10} className="px-5 py-12 text-center text-[#5B6577]">
                     Loading invoices…
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-5 py-12 text-center text-[#8B95A5]">
+                  <td colSpan={10} className="px-5 py-12 text-center text-[#5B6577]">
                     No invoices found.
                   </td>
                 </tr>
@@ -482,7 +483,7 @@ export default function InvoiceDirectory() {
                 filtered.map((invoice) => (
                   <tr
                     key={invoice.id}
-                    className="border-t border-black/[0.04] transition hover:bg-[#F8FAFB]"
+                    className="border-t border-black/[0.04] transition hover:bg-[#d4dee9]"
                   >
                     <td className="px-5 py-3.5 font-semibold text-[#0B1220]">
                       {invoice.invoiceNumber}
@@ -561,9 +562,9 @@ export default function InvoiceDirectory() {
             className="absolute inset-0 bg-[#051A2D]/55"
             onClick={closePayment}
           />
-          <div className="relative z-10 w-full max-w-md rounded-[28px] bg-white p-6 shadow-2xl sm:p-7">
+          <div className="relative z-10 w-full max-w-md rounded-[28px] bg-[#e4ebf2] p-6 shadow-2xl sm:p-7">
             <h2 className="text-xl font-bold text-[#0B1220]">Record payment</h2>
-            <p className="mt-1 text-sm font-medium text-[#8B95A5]">
+            <p className="mt-1 text-sm font-semibold text-[#5B6577]">
               {paying.invoiceNumber} · outstanding{" "}
               {formatInvoiceMoney(Number(paying.outstanding || 0), paying.currency)}
             </p>
@@ -577,7 +578,7 @@ export default function InvoiceDirectory() {
                   autoFocus
                 />
               </Field>
-              <p className="text-sm font-medium text-[#8B95A5]">
+              <p className="text-sm font-semibold text-[#5B6577]">
                 Enter the outstanding amount for a full payment, or less for a partial payment.
               </p>
               {paymentError ? (
@@ -590,7 +591,7 @@ export default function InvoiceDirectory() {
                   type="button"
                   onClick={closePayment}
                   disabled={paymentSaving}
-                  className="rounded-full px-4 py-2.5 text-sm font-bold text-[#8B95A5] hover:bg-[#F3F5F7] disabled:opacity-50"
+                  className="rounded-full px-4 py-2.5 text-sm font-bold text-[#5B6577] hover:bg-[#d4dee9] disabled:opacity-50"
                 >
                   Cancel
                 </button>
@@ -615,13 +616,13 @@ export default function InvoiceDirectory() {
             className="absolute inset-0 bg-[#051A2D]/55"
             onClick={closeModal}
           />
-          <div className="relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-[28px] bg-white p-6 shadow-2xl sm:p-7">
+          <div className="relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-[28px] bg-[#e4ebf2] p-6 shadow-2xl sm:p-7">
             <div className="mb-5 flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-xl font-bold text-[#0B1220]">
                   {editing ? "Edit invoice" : "Add invoice"}
                 </h2>
-                <p className="mt-1 text-sm font-medium text-[#8B95A5]">
+                <p className="mt-1 text-sm font-semibold text-[#5B6577]">
                   {editing
                     ? "Update the invoice number, amount, or due date. Payment status follows recorded payments."
                     : "Create a billing record from an Approved (or later) order."}
@@ -630,7 +631,7 @@ export default function InvoiceDirectory() {
               <button
                 type="button"
                 onClick={closeModal}
-                className="rounded-full px-3 py-1 text-sm font-bold text-[#8B95A5] hover:bg-[#F3F5F7]"
+                className="rounded-full px-3 py-1 text-sm font-bold text-[#5B6577] hover:bg-[#d4dee9]"
               >
                 Close
               </button>
@@ -645,20 +646,17 @@ export default function InvoiceDirectory() {
                       invoice.
                     </p>
                   ) : (
-                    <select
+                    <ScrollSelect
                       value={form.orderId}
-                      onChange={(e) => onSelectOrder(e.target.value)}
+                      placeholder="Select order"
+                      options={invoiceableOrders.map((order) => ({
+                        value: order.id,
+                        label: `${order.orderNumber} · remaining ${formatMoney(remainingAmount(order))} · ${order.status}`,
+                      }))}
+                      onChange={onSelectOrder}
                       className={fieldClass}
                       disabled={!canEdit}
-                    >
-                      <option value="">Select order</option>
-                      {invoiceableOrders.map((order) => (
-                        <option key={order.id} value={order.id}>
-                          {order.orderNumber} · remaining{" "}
-                          {formatMoney(remainingAmount(order))} · {order.status}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   )}
                 </Field>
               ) : (
@@ -691,7 +689,7 @@ export default function InvoiceDirectory() {
                     disabled={!canEdit}
                   />
                   {amountCap() != null ? (
-                    <p className="mt-1.5 text-xs font-medium text-[#8B95A5]">
+                    <p className="mt-1.5 text-xs font-semibold text-[#5B6577]">
                       Up to {formatInvoiceMoney(amountCap() ?? 0)}
                     </p>
                   ) : null}
@@ -706,21 +704,21 @@ export default function InvoiceDirectory() {
                   />
                 </Field>
                 {editing ? (
-                  <div className="grid gap-3 rounded-2xl bg-[#F8FAFB] px-4 py-3 text-sm sm:col-span-2 sm:grid-cols-3">
+                  <div className="grid gap-3 rounded-2xl bg-[#e8eef4] px-4 py-3 text-sm sm:col-span-2 sm:grid-cols-3">
                     <div>
-                      <p className="text-xs font-bold uppercase tracking-wide text-[#8B95A5]">Paid</p>
+                      <p className="text-xs font-bold uppercase tracking-wide text-[#5B6577]">Paid</p>
                       <p className="mt-1 font-semibold text-[#0B1220]">
                         {formatInvoiceMoney(Number(editing.amountPaid || 0))}
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs font-bold uppercase tracking-wide text-[#8B95A5]">Outstanding</p>
+                      <p className="text-xs font-bold uppercase tracking-wide text-[#5B6577]">Outstanding</p>
                       <p className="mt-1 font-semibold text-[#0B1220]">
                         {formatInvoiceMoney(Number(editing.outstanding || 0))}
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs font-bold uppercase tracking-wide text-[#8B95A5]">Status</p>
+                      <p className="text-xs font-bold uppercase tracking-wide text-[#5B6577]">Status</p>
                       <p className="mt-1 font-semibold text-[#0B1220]">
                         {invoiceStatusLabel(editing.status)}
                       </p>
@@ -740,7 +738,7 @@ export default function InvoiceDirectory() {
                   type="button"
                   onClick={closeModal}
                   disabled={saving}
-                  className="rounded-full px-4 py-2.5 text-sm font-bold text-[#8B95A5] hover:bg-[#F3F5F7] disabled:opacity-50"
+                  className="rounded-full px-4 py-2.5 text-sm font-bold text-[#5B6577] hover:bg-[#d4dee9] disabled:opacity-50"
                 >
                   Cancel
                 </button>
@@ -766,8 +764,8 @@ export default function InvoiceDirectory() {
 
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[22px] border border-black/[0.04] bg-white px-5 py-4">
-      <p className="text-xs font-semibold uppercase tracking-wide text-[#8B95A5]">{label}</p>
+    <div className="rounded-[22px] border border-black/[0.04] bg-[#e4ebf2] px-5 py-4">
+      <p className="text-xs font-semibold uppercase tracking-wide text-[#5B6577]">{label}</p>
       <p className="mt-1 text-xl font-bold text-[#0B1220]">{value}</p>
     </div>
   );
@@ -784,7 +782,7 @@ function Field({
 }) {
   return (
     <label className={`block ${className}`}>
-      <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-[#8B95A5]">
+      <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-[#5B6577]">
         {label}
       </span>
       {children}

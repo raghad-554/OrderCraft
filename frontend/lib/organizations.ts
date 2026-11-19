@@ -29,18 +29,52 @@ export type SwitchOrganizationResult = {
   enabledPageKeys: string[];
 };
 
+export type OrganizationPaymentTerms = "Net30" | "Net60" | "Immediate";
+
 export type OrganizationSettings = {
+  name: string;
+  slug: string;
+  contactEmail?: string | null;
+  contactPhone?: string | null;
+  logoUrl?: string | null;
+  defaultCurrency: string;
+  defaultTaxRate: number;
+  defaultPaymentTerms: OrganizationPaymentTerms;
   approvalThreshold: number;
 };
+
+export type UpdateOrganizationSettingsPayload = {
+  name: string;
+  contactEmail?: string | null;
+  contactPhone?: string | null;
+  logoUrl?: string | null;
+  defaultCurrency: string;
+  defaultTaxRate: number;
+  defaultPaymentTerms: OrganizationPaymentTerms;
+  approvalThreshold: number;
+};
+
+export const ORGANIZATION_CURRENCIES = [
+  "USD",
+  "EUR",
+  "GBP",
+  "SAR",
+  "AED",
+  "JOD",
+  "EGP",
+  "KWD",
+  "QAR",
+  "BHD",
+] as const;
 
 export function getOrganizationSettings() {
   return apiFetch<OrganizationSettings>("/api/Organizations/settings");
 }
 
-export function updateOrganizationSettings(approvalThreshold: number) {
+export function updateOrganizationSettings(payload: UpdateOrganizationSettingsPayload) {
   return apiFetch<OrganizationSettings>("/api/Organizations/settings", {
     method: "PUT",
-    body: JSON.stringify({ approvalThreshold }),
+    body: JSON.stringify(payload),
   });
 }
 

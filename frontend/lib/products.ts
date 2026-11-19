@@ -1,4 +1,5 @@
 import { apiFetch } from "@/lib/api";
+import { formatOrgMoney } from "@/lib/money";
 
 export type Product = {
   id: string;
@@ -10,6 +11,7 @@ export type Product = {
   description?: string | null;
   sku: string;
   price: number;
+  currency?: string | null;
   stockQuantity: number;
   isActive: boolean;
 };
@@ -65,10 +67,6 @@ export function deleteProduct(id: string) {
   return apiFetch<void>(`/api/Products/${id}`, { method: "DELETE" });
 }
 
-export function formatProductMoney(value: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 2,
-  }).format(value);
+export function formatProductMoney(value: number, currency?: string | null) {
+  return formatOrgMoney(value, currency);
 }

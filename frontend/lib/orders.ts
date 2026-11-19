@@ -1,4 +1,5 @@
 import { apiFetch, newIdempotencyKey } from "@/lib/api";
+import { formatOrgMoney } from "@/lib/money";
 import { buildPurchaseOrderPdf } from "@/lib/order-pdf";
 import type { Product } from "@/lib/products";
 import { listProducts } from "@/lib/products";
@@ -49,6 +50,7 @@ export type PurchaseOrder = {
   createdByUserId: string;
   status: OrderStatus;
   totalAmount: number;
+  currency?: string | null;
   taxRate?: number;
   taxAmount?: number;
   subtotalAmount?: number;
@@ -297,12 +299,8 @@ export function formatOrderDateTime(value: string) {
   }).format(date);
 }
 
-export function formatMoney(value: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 2,
-  }).format(value);
+export function formatMoney(value: number, currency?: string | null) {
+  return formatOrgMoney(value, currency);
 }
 
 export function paymentTermsLabel(value?: PaymentTerms | null) {
@@ -325,7 +323,7 @@ export function statusTone(status: OrderStatus) {
     case "Delivered":
       return "bg-emerald-50 text-emerald-700";
     case "Cancelled":
-      return "bg-slate-100 text-slate-500";
+      return "bg-slate-100 text-slate-600";
   }
 }
 

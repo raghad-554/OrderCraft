@@ -32,6 +32,22 @@ public class Organization
     [MaxLength(20)]
     public string? ContactPhone { get; set; }
 
+    /// <summary>Optional public logo URL for the organization.</summary>
+    [MaxLength(500)]
+    public string? LogoUrl { get; set; }
+
+    /// <summary>Default invoice/order currency code (ISO 4217).</summary>
+    [Required]
+    [MaxLength(3)]
+    public string DefaultCurrency { get; set; } = "USD";
+
+    /// <summary>Default tax rate (%) applied when creating new orders.</summary>
+    [Column(TypeName = "numeric(5,2)")]
+    public decimal DefaultTaxRate { get; set; }
+
+    /// <summary>Default payment terms for new orders.</summary>
+    public PaymentTerms DefaultPaymentTerms { get; set; } = PaymentTerms.Net30;
+
     /// <summary>Comma-separated AppPages keys this tenant may use.</summary>
     [Required]
     [MaxLength(2000)]

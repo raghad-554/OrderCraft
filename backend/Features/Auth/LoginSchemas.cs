@@ -7,6 +7,9 @@ public class LoginRequest
 {
     public string Username { get; set; } = string.Empty;
     public string Password { get; set; } = string.Empty;
+
+    /// <summary>When true, auth cookie persists for JWT ExpireMinutes; otherwise session cookie.</summary>
+    public bool RememberMe { get; set; }
 }
 
 public class LoginUserDto

@@ -41,10 +41,10 @@ const NAVY = "#051A2D";
 const NAVY_MID = "#0A3050";
 const TEAL = "#2DD4A8";
 const INK = "#0B1220";
-const MUTED = "#8B95A5";
+const MUTED = "#5B6577";
 const BODY = "#4B5563";
 const RULE = "#E6E9EE";
-const WASH = "#F8FAFB";
+const WASH = "#e8eef4";
 const WHITE = "#FFFFFF";
 const HEADER_H = 78;
 
@@ -263,7 +263,7 @@ function assemblePdf(streams: string[]) {
 }
 
 function pillColors(label: string) {
-  return PILL[label as StatusKey] ?? { bg: "#F3F5F7", fg: "#4B5563" };
+  return PILL[label as StatusKey] ?? { bg: "#d4dee9", fg: "#4B5563" };
 }
 
 function drawPill(page: Page, label: string, x: number, y: number) {

@@ -15,10 +15,14 @@ namespace OrderCraft.Controllers;
 public class OrganizationsController : ControllerBase
 {
     private readonly IOrganizationService _organizationService;
+    private readonly IAuthCookieService _authCookies;
 
-    public OrganizationsController(IOrganizationService organizationService)
+    public OrganizationsController(
+        IOrganizationService organizationService,
+        IAuthCookieService authCookies)
     {
         _organizationService = organizationService;
+        _authCookies = authCookies;
     }
 
     [HttpGet("mine")]
@@ -67,11 +71,18 @@ public class OrganizationsController : ControllerBase
         if (error is not null)
             return BadRequest(new { message = error });
 
+        if (result is not null && !string.IsNullOrWhiteSpace(result.Token))
+        {
+            // Keep session persistence aligned with an existing local remember preference cookie max-age window.
+            _authCookies.SetAuthCookie(HttpContext, result.Token, remember: true);
+            result.Token = string.Empty;
+        }
+
         return Ok(result);
     }
 
+    /// <summary>Readable by any org member so order forms can apply commercial defaults.</summary>
     [HttpGet("settings")]
-    [RequirePage("settings")]
     public async Task<IActionResult> GetSettings(CancellationToken cancellationToken)
     {
         var settings = await _organizationService.GetSettingsAsync(cancellationToken);

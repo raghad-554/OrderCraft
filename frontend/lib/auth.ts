@@ -1,5 +1,6 @@
 import type { PagePermissionItem } from "@/lib/permissions";
 import type { OrganizationSummary } from "@/lib/organizations";
+import { API_BASE } from "@/lib/api";
 
 export type AuthUser = {
   id: string;
@@ -21,25 +22,23 @@ export type AuthSession = {
   enabledPageKeys?: string[];
 };
 
-function readToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return (
-    sessionStorage.getItem("ordercraft_token") ||
-    localStorage.getItem("ordercraft_token")
-  );
+const USER_KEY = "ordercraft_user";
+const REMEMBER_KEY = "ordercraft_remember";
+const LEGACY_TOKEN_KEYS = ["ordercraft_token"] as const;
+
+/** Remove any JWT leftovers from browser storage (HttpOnly cookie is the auth source). */
+export function purgeAuthTokensFromStorage() {
+  if (typeof window === "undefined") return;
+  for (const key of LEGACY_TOKEN_KEYS) {
+    sessionStorage.removeItem(key);
+    localStorage.removeItem(key);
+  }
 }
 
 function readUserRaw(): string | null {
   if (typeof window === "undefined") return null;
-  if (sessionStorage.getItem("ordercraft_token")) {
-    return sessionStorage.getItem("ordercraft_user");
-  }
-  if (localStorage.getItem("ordercraft_token")) {
-    return localStorage.getItem("ordercraft_user");
-  }
   return (
-    sessionStorage.getItem("ordercraft_user") ||
-    localStorage.getItem("ordercraft_user")
+    sessionStorage.getItem(USER_KEY) || localStorage.getItem(USER_KEY)
   );
 }
 
@@ -70,21 +69,28 @@ function normalizePermissions(raw: unknown): PagePermissionItem[] {
     .filter((x): x is PagePermissionItem => x != null);
 }
 
+/** @deprecated JWT lives in HttpOnly cookie; kept for call-site compatibility. */
 export function getAuthToken(): string | null {
-  const token = readToken();
-  if (!token || token === "undefined" || token === "null") return null;
-  return token;
+  purgeAuthTokensFromStorage();
+  return null;
 }
 
 export function getSession(): AuthSession | null {
   if (typeof window === "undefined") return null;
 
-  const token = getAuthToken();
+  purgeAuthTokensFromStorage();
+
   const raw = readUserRaw();
-  if (!token || !raw) return null;
+  if (!raw) return null;
 
   try {
     const parsed = JSON.parse(raw);
+    // Drop any historically persisted token fields from the user blob.
+    if (parsed && typeof parsed === "object") {
+      delete parsed.token;
+      delete parsed.Token;
+    }
+
     const user = parsed.user ?? parsed;
     if (!user?.username) return null;
 
@@ -95,8 +101,8 @@ export function getSession(): AuthSession | null {
     }
 
     const orgRaw = (parsed.organization ?? parsed.Organization) as Record<string, unknown> | undefined;
-    const readKeys = (raw: unknown): string[] =>
-      Array.isArray(raw) ? raw.map((item) => String(item)) : [];
+    const readKeys = (rawKeys: unknown): string[] =>
+      Array.isArray(rawKeys) ? rawKeys.map((item) => String(item)) : [];
     const org = orgRaw
       ? {
           id: String(orgRaw.id ?? orgRaw.Id ?? ""),
@@ -128,7 +134,7 @@ export function getSession(): AuthSession | null {
     );
 
     return {
-      token,
+      token: "",
       expiresAt,
       user: {
         id: String(user.id ?? user.Id ?? ""),
@@ -166,40 +172,75 @@ export function saveSession(
   },
   remember: boolean,
 ) {
-  const token = data.token ?? data.Token;
-  if (!token) throw new Error("Login response missing token");
+  const user = data.user ?? (data as { User?: Record<string, unknown> }).User;
+  if (!user) throw new Error("Login response missing user");
 
   const storage = remember ? localStorage : sessionStorage;
-  sessionStorage.removeItem("ordercraft_token");
-  sessionStorage.removeItem("ordercraft_user");
-  localStorage.removeItem("ordercraft_token");
-  localStorage.removeItem("ordercraft_user");
+  purgeAuthTokensFromStorage();
+  sessionStorage.removeItem(USER_KEY);
+  localStorage.removeItem(USER_KEY);
+  sessionStorage.removeItem(REMEMBER_KEY);
+  localStorage.removeItem(REMEMBER_KEY);
 
-  storage.setItem("ordercraft_token", token);
+  const { token: _t, Token: _T, ...rest } = data as Record<string, unknown>;
   storage.setItem(
-    "ordercraft_user",
+    USER_KEY,
     JSON.stringify({
-      ...data,
+      ...rest,
       permissions: normalizePermissions(data.permissions ?? data.Permissions),
     }),
   );
+  storage.setItem(REMEMBER_KEY, remember ? "1" : "0");
 }
 
 export function updateSessionPermissions(permissions: PagePermissionItem[]) {
   if (typeof window === "undefined") return;
+  purgeAuthTokensFromStorage();
   const raw =
-    sessionStorage.getItem("ordercraft_user") ||
-    localStorage.getItem("ordercraft_user");
+    sessionStorage.getItem(USER_KEY) || localStorage.getItem(USER_KEY);
   if (!raw) return;
 
   try {
     const parsed = JSON.parse(raw);
+    delete parsed.token;
+    delete parsed.Token;
     const next = { ...parsed, permissions };
-    if (sessionStorage.getItem("ordercraft_user")) {
-      sessionStorage.setItem("ordercraft_user", JSON.stringify(next));
+    if (sessionStorage.getItem(USER_KEY)) {
+      sessionStorage.setItem(USER_KEY, JSON.stringify(next));
     } else {
-      localStorage.setItem("ordercraft_user", JSON.stringify(next));
+      localStorage.setItem(USER_KEY, JSON.stringify(next));
     }
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Patch the current org name (and list entry) after Settings save. */
+export function updateSessionOrganizationName(name: string) {
+  if (typeof window === "undefined") return;
+  purgeAuthTokensFromStorage();
+  const inSession = !!sessionStorage.getItem(USER_KEY);
+  const raw =
+    sessionStorage.getItem(USER_KEY) || localStorage.getItem(USER_KEY);
+  if (!raw) return;
+
+  try {
+    const parsed = JSON.parse(raw);
+    delete parsed.token;
+    delete parsed.Token;
+    const organization = parsed.organization
+      ? { ...parsed.organization, name }
+      : parsed.organization;
+    const organizations = Array.isArray(parsed.organizations)
+      ? parsed.organizations.map((item: OrganizationSummary) =>
+          item?.id && organization?.id && item.id === organization.id
+            ? { ...item, name }
+            : item,
+        )
+      : parsed.organizations;
+    const next = { ...parsed, organization, organizations };
+    const storage = inSession ? sessionStorage : localStorage;
+    storage.setItem(USER_KEY, JSON.stringify(next));
   } catch {
     /* ignore */
   }
@@ -207,27 +248,22 @@ export function updateSessionPermissions(permissions: PagePermissionItem[]) {
 
 export function clearSession() {
   if (typeof window === "undefined") return;
-  sessionStorage.removeItem("ordercraft_token");
-  sessionStorage.removeItem("ordercraft_user");
-  localStorage.removeItem("ordercraft_token");
-  localStorage.removeItem("ordercraft_user");
+  purgeAuthTokensFromStorage();
+  sessionStorage.removeItem(USER_KEY);
+  localStorage.removeItem(USER_KEY);
+  sessionStorage.removeItem(REMEMBER_KEY);
+  localStorage.removeItem(REMEMBER_KEY);
 }
 
-/** Revoke the current JWT on the server, then clear local session storage. */
+/** Revoke the current JWT on the server (cookie), then clear local UI session storage. */
 export async function logoutSession() {
-  const token = getAuthToken();
-  if (token) {
-    try {
-      const apiBase =
-        process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ||
-        "http://localhost:5069";
-      await fetch(`${apiBase}/api/Auth/logout`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-    } catch {
-      // Still clear local session even if the network call fails.
-    }
+  try {
+    await fetch(`${API_BASE}/api/Auth/logout`, {
+      method: "POST",
+      credentials: "include",
+    });
+  } catch {
+    // Still clear local session even if the network call fails.
   }
   clearSession();
 }
@@ -251,7 +287,7 @@ export function canViewOrderFinancialHistory(role: string) {
 
 export function applyOrganizationSession(
   data: {
-    token: string;
+    token?: string;
     expiresAt: string;
     organization: OrganizationSummary;
     permissions: PagePermissionItem[];
@@ -264,7 +300,7 @@ export function applyOrganizationSession(
   const current = getSession();
   const useRemember =
     remember ??
-    (typeof window !== "undefined" && !!localStorage.getItem("ordercraft_token"));
+    (typeof window !== "undefined" && localStorage.getItem(REMEMBER_KEY) === "1");
   const orgs = data.organizations?.length
     ? data.organizations
     : current?.organizations?.length
@@ -277,7 +313,6 @@ export function applyOrganizationSession(
   }
   saveSession(
     {
-      token: data.token,
       expiresAt: data.expiresAt,
       user: data.user,
       permissions: data.permissions,

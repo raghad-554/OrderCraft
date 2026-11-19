@@ -10,6 +10,7 @@ import {
   useState,
 } from "react";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
+import ScrollSelect from "@/components/ui/ScrollSelect";
 import { ApiError } from "@/lib/api";
 import { getSession, isAdmin } from "@/lib/auth";
 import { listCompanies, type Company } from "@/lib/companies";
@@ -47,7 +48,7 @@ import {
 } from "@/lib/permissions";
 
 const fieldClass =
-  "w-full rounded-2xl border border-black/[0.06] bg-[#F3F5F7] px-3.5 py-2.5 text-sm font-medium text-[#0B1220] outline-none focus:bg-white focus:ring-2 focus:ring-[#051A2D]/30";
+  "w-full rounded-2xl border border-black/[0.06] bg-[#d4dee9] px-3.5 py-2.5 text-sm font-medium text-[#0B1220] outline-none focus:bg-[#e4ebf2] focus:ring-2 focus:ring-[#051A2D]/30";
 
 const PAGE_SIZE = 8;
 
@@ -445,7 +446,7 @@ export default function EmployeeDirectory() {
             {canViewPage(session?.permissions, "roles", isAdmin(session?.user.role ?? "")) ? (
               <Link
                 href="/admin/employees/roles"
-                className="rounded-full bg-white px-5 py-2.5 text-sm font-bold text-[#051A2D] ring-1 ring-black/[0.08] transition hover:bg-[#F8FAFB]"
+                className="rounded-full bg-[#e4ebf2] px-5 py-2.5 text-sm font-bold text-[#051A2D] ring-1 ring-black/[0.08] transition hover:bg-[#d4dee9]"
               >
                 Roles &amp; Permissions
               </Link>
@@ -470,10 +471,10 @@ export default function EmployeeDirectory() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by name, username, or email…"
-            className="w-full rounded-2xl border border-black/[0.06] bg-white px-4 py-2.5 text-sm font-medium text-[#0B1220] outline-none ring-[#051A2D]/30 placeholder:text-[#8B95A5] focus:ring-2"
+            className="w-full rounded-2xl border border-black/[0.06] bg-[#e4ebf2] px-4 py-2.5 text-sm font-medium text-[#0B1220] outline-none ring-[#051A2D]/30 placeholder:text-[#5B6577] focus:ring-2"
           />
         </label>
-        <p className="text-sm font-medium text-[#8B95A5]">
+        <p className="text-sm font-semibold text-[#5B6577]">
           {loading
             ? "Loading…"
             : `${employees.length} ${employees.length === 1 ? "employee" : "employees"}${canEdit ? "" : " · view only"}`}
@@ -484,10 +485,10 @@ export default function EmployeeDirectory() {
         <div className="mb-4 space-y-3">
           <form
             onSubmit={(e) => void onAddExisting(e)}
-            className="flex flex-wrap items-end gap-2 rounded-[24px] border border-black/[0.04] bg-white p-4"
+            className="flex flex-wrap items-end gap-2 rounded-[24px] border border-black/[0.04] bg-[#e4ebf2] p-4"
           >
             <label className="min-w-[220px] flex-1">
-              <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-[#8B95A5]">
+              <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-[#5B6577]">
                 Add existing member
               </span>
               <input
@@ -498,22 +499,21 @@ export default function EmployeeDirectory() {
               />
             </label>
             <label className="min-w-[180px]">
-              <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-[#8B95A5]">
+              <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-[#5B6577]">
                 Department
               </span>
-              <select
+              <ScrollSelect
                 value={existingDepartmentId}
-                onChange={(e) => setExistingDepartmentId(e.target.value)}
-                className={fieldClass}
-              >
-                {departments
+                placeholder="Select department"
+                options={departments
                   .filter((department) => department.isActive)
-                  .map((department) => (
-                    <option key={department.id} value={department.id}>
-                      {department.name}
-                    </option>
-                  ))}
-              </select>
+                  .map((department) => ({
+                    value: department.id,
+                    label: department.name,
+                  }))}
+                onChange={setExistingDepartmentId}
+                className={fieldClass}
+              />
             </label>
             <button
               type="submit"
@@ -526,10 +526,10 @@ export default function EmployeeDirectory() {
 
           <form
             onSubmit={(e) => void onInvite(e)}
-            className="flex flex-wrap items-end gap-2 rounded-[24px] border border-black/[0.04] bg-white p-4"
+            className="flex flex-wrap items-end gap-2 rounded-[24px] border border-black/[0.04] bg-[#e4ebf2] p-4"
           >
             <label className="min-w-[220px] flex-1">
-              <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-[#8B95A5]">
+              <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-[#5B6577]">
                 Invite by email
               </span>
               <input
@@ -541,22 +541,21 @@ export default function EmployeeDirectory() {
               />
             </label>
             <label className="min-w-[180px]">
-              <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-[#8B95A5]">
+              <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-[#5B6577]">
                 Department
               </span>
-              <select
+              <ScrollSelect
                 value={inviteDepartmentId}
-                onChange={(e) => setInviteDepartmentId(e.target.value)}
-                className={fieldClass}
-              >
-                {departments
+                placeholder="Select department"
+                options={departments
                   .filter((department) => department.isActive)
-                  .map((department) => (
-                    <option key={department.id} value={department.id}>
-                      {department.name}
-                    </option>
-                  ))}
-              </select>
+                  .map((department) => ({
+                    value: department.id,
+                    label: department.name,
+                  }))}
+                onChange={setInviteDepartmentId}
+                className={fieldClass}
+              />
             </label>
             <label className="flex items-center gap-2 pb-2.5 text-sm font-medium text-[#4B5563]">
               <input
@@ -570,7 +569,7 @@ export default function EmployeeDirectory() {
             <button
               type="submit"
               disabled={inviteBusy || !inviteEmail.trim() || !inviteDepartmentId}
-              className="rounded-full border border-[#051A2D] bg-white px-5 py-2.5 text-sm font-bold text-[#051A2D] disabled:opacity-50"
+              className="rounded-full border border-[#051A2D] bg-[#e4ebf2] px-5 py-2.5 text-sm font-bold text-[#051A2D] disabled:opacity-50"
             >
               {inviteBusy ? "Inviting…" : "Send invite"}
             </button>
@@ -584,8 +583,8 @@ export default function EmployeeDirectory() {
           ) : null}
 
           {pendingInvites.length > 0 ? (
-            <div className="overflow-hidden rounded-[24px] border border-black/[0.04] bg-white">
-              <div className="border-b border-black/[0.04] px-4 py-3 text-xs font-bold uppercase tracking-wide text-[#8B95A5]">
+            <div className="overflow-hidden rounded-[24px] border border-black/[0.04] bg-[#e4ebf2]">
+              <div className="border-b border-black/[0.04] px-4 py-3 text-xs font-bold uppercase tracking-wide text-[#5B6577]">
                 Pending invitations
               </div>
               <ul className="divide-y divide-black/[0.04]">
@@ -596,7 +595,7 @@ export default function EmployeeDirectory() {
                   >
                     <div>
                       <p className="font-semibold text-[#0B1220]">{invite.email}</p>
-                      <p className="text-[#8B95A5]">
+                      <p className="text-[#5B6577]">
                         {invite.departmentName}
                         {invite.isOrgAdmin ? " · Admin" : ""} · expires{" "}
                         {new Date(invite.expiresAt).toLocaleDateString()}
@@ -636,10 +635,10 @@ export default function EmployeeDirectory() {
         </div>
       ) : null}
 
-      <div className="overflow-hidden rounded-[24px] border border-black/[0.04] bg-white">
+      <div className="overflow-hidden rounded-[24px] border border-black/[0.04] bg-[#e4ebf2]">
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
-            <thead className="bg-[#F8FAFB] text-xs font-semibold tracking-wide text-[#8B95A5]">
+            <thead className="bg-[#e8eef4] text-xs font-semibold tracking-wide text-[#5B6577]">
               <tr>
                 <th className="px-5 py-3.5">Name</th>
                 <th className="px-5 py-3.5">Email</th>
@@ -652,13 +651,13 @@ export default function EmployeeDirectory() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-5 py-12 text-center text-[#8B95A5]">
+                  <td colSpan={6} className="px-5 py-12 text-center text-[#5B6577]">
                     Loading employees…
                   </td>
                 </tr>
               ) : pageRows.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-5 py-12 text-center text-[#8B95A5]">
+                  <td colSpan={6} className="px-5 py-12 text-center text-[#5B6577]">
                     No employees found.
                   </td>
                 </tr>
@@ -668,14 +667,14 @@ export default function EmployeeDirectory() {
                   return (
                     <tr
                       key={employee.id}
-                      className="border-t border-black/[0.04] transition hover:bg-[#F8FAFB]"
+                      className="border-t border-black/[0.04] transition hover:bg-[#d4dee9]"
                     >
                       <td className="px-5 py-3.5">
                         <p className="font-semibold text-[#0B1220]">{employee.fullName}</p>
-                        <p className="mt-0.5 text-xs font-medium text-[#8B95A5]">
+                        <p className="mt-0.5 text-xs font-semibold text-[#5B6577]">
                           @{employee.username}
                           {!employee.isActive ? (
-                            <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-500">
+                            <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-600">
                               Inactive
                             </span>
                           ) : null}
@@ -743,7 +742,7 @@ export default function EmployeeDirectory() {
 
         {employees.length > PAGE_SIZE ? (
           <div className="flex items-center justify-between gap-3 border-t border-black/[0.04] px-5 py-3">
-            <p className="text-xs font-medium text-[#8B95A5]">
+            <p className="text-xs font-semibold text-[#5B6577]">
               Page {currentPage} of {pageCount}
             </p>
             <div className="flex gap-2">
@@ -751,7 +750,7 @@ export default function EmployeeDirectory() {
                 type="button"
                 disabled={currentPage <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="rounded-full bg-[#F3F5F7] px-3 py-1.5 text-xs font-bold text-[#051A2D] disabled:opacity-40"
+                className="rounded-full bg-[#d4dee9] px-3 py-1.5 text-xs font-bold text-[#051A2D] disabled:opacity-40"
               >
                 Previous
               </button>
@@ -759,7 +758,7 @@ export default function EmployeeDirectory() {
                 type="button"
                 disabled={currentPage >= pageCount}
                 onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
-                className="rounded-full bg-[#F3F5F7] px-3 py-1.5 text-xs font-bold text-[#051A2D] disabled:opacity-40"
+                className="rounded-full bg-[#d4dee9] px-3 py-1.5 text-xs font-bold text-[#051A2D] disabled:opacity-40"
               >
                 Next
               </button>
@@ -776,13 +775,13 @@ export default function EmployeeDirectory() {
             className="absolute inset-0 bg-[#051A2D]/55"
             onClick={closeModal}
           />
-          <div className="relative z-10 max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-[28px] bg-white p-6 shadow-2xl sm:p-7">
+          <div className="relative z-10 max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-[28px] bg-[#e4ebf2] p-6 shadow-2xl sm:p-7">
             <div className="mb-5 flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-xl font-bold text-[#0B1220]">
                   {editing ? "Edit employee" : "Add employee"}
                 </h2>
-                <p className="mt-1 text-sm font-medium text-[#8B95A5]">
+                <p className="mt-1 text-sm font-semibold text-[#5B6577]">
                   {editing
                     ? "Update account details, department, and company."
                     : "Set username, email, and password. They sign in with these credentials."}
@@ -791,7 +790,7 @@ export default function EmployeeDirectory() {
               <button
                 type="button"
                 onClick={closeModal}
-                className="rounded-full px-3 py-1 text-sm font-bold text-[#8B95A5] hover:bg-[#F3F5F7]"
+                className="rounded-full px-3 py-1 text-sm font-bold text-[#5B6577] hover:bg-[#d4dee9]"
               >
                 Close
               </button>
@@ -849,26 +848,25 @@ export default function EmployeeDirectory() {
                 </Field>
                 <Field label="Department *" className="sm:col-span-2">
                   <div className="flex flex-wrap gap-2">
-                    <select
-                      value={form.departmentId}
-                      onChange={(e) =>
-                        setForm((f) => ({ ...f, departmentId: e.target.value }))
-                      }
-                      className={`${fieldClass} min-w-0 flex-1`}
-                    >
-                      <option value="">Select a department</option>
-                      {departments
-                        .filter(
-                          (department) =>
-                            department.isActive || department.id === form.departmentId,
-                        )
-                        .map((department) => (
-                          <option key={department.id} value={department.id}>
-                            {department.name}
-                            {department.isActive ? "" : " (inactive)"}
-                          </option>
-                        ))}
-                    </select>
+                    <div className="min-w-0 flex-1">
+                      <ScrollSelect
+                        value={form.departmentId}
+                        placeholder="Select a department"
+                        options={departments
+                          .filter(
+                            (department) =>
+                              department.isActive || department.id === form.departmentId,
+                          )
+                          .map((department) => ({
+                            value: department.id,
+                            label: `${department.name}${department.isActive ? "" : " (inactive)"}`,
+                          }))}
+                        onChange={(departmentId) =>
+                          setForm((f) => ({ ...f, departmentId }))
+                        }
+                        className={fieldClass}
+                      />
+                    </div>
                     {callerIsAdmin ? (
                       <button
                         type="button"
@@ -881,18 +879,16 @@ export default function EmployeeDirectory() {
                   </div>
                 </Field>
                 <Field label="Company" className="sm:col-span-2">
-                  <select
+                  <ScrollSelect
                     value={form.companyId}
-                    onChange={(e) => setForm((f) => ({ ...f, companyId: e.target.value }))}
+                    placeholder="No company"
+                    options={companies.map((company) => ({
+                      value: company.id,
+                      label: company.name,
+                    }))}
+                    onChange={(companyId) => setForm((f) => ({ ...f, companyId }))}
                     className={fieldClass}
-                  >
-                    <option value="">No company</option>
-                    {companies.map((company) => (
-                      <option key={company.id} value={company.id}>
-                        {company.name}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </Field>
                 {callerIsAdmin ? (
                   <label className="flex items-start gap-2 sm:col-span-2">
@@ -908,7 +904,7 @@ export default function EmployeeDirectory() {
                       <span className="block text-sm font-semibold text-[#0B1220]">
                         Organization admin
                       </span>
-                      <span className="block text-xs font-medium text-[#8B95A5]">
+                      <span className="block text-xs font-semibold text-[#5B6577]">
                         Full access to every page. Department defaults still apply to everyone else.
                       </span>
                     </span>
@@ -936,7 +932,7 @@ export default function EmployeeDirectory() {
                   type="button"
                   onClick={closeModal}
                   disabled={saving}
-                  className="rounded-full px-4 py-2.5 text-sm font-bold text-[#8B95A5] hover:bg-[#F3F5F7] disabled:opacity-50"
+                  className="rounded-full px-4 py-2.5 text-sm font-bold text-[#5B6577] hover:bg-[#d4dee9] disabled:opacity-50"
                 >
                   Cancel
                 </button>
@@ -961,9 +957,9 @@ export default function EmployeeDirectory() {
             className="absolute inset-0 bg-[#051A2D]/55"
             onClick={closeReset}
           />
-          <div className="relative z-10 w-full max-w-md rounded-[28px] bg-white p-6 shadow-2xl sm:p-7">
+          <div className="relative z-10 w-full max-w-md rounded-[28px] bg-[#e4ebf2] p-6 shadow-2xl sm:p-7">
             <h2 className="text-xl font-bold text-[#0B1220]">Set organization password</h2>
-            <p className="mt-1 text-sm font-medium text-[#8B95A5]">
+            <p className="mt-1 text-sm font-semibold text-[#5B6577]">
               {resetTarget.fullName} will use this password to open this organization. Other
               organizations keep their own passwords.
             </p>
@@ -1006,7 +1002,7 @@ export default function EmployeeDirectory() {
                   type="button"
                   onClick={closeReset}
                   disabled={resetSaving}
-                  className="rounded-full px-4 py-2 text-sm font-bold text-[#8B95A5] hover:bg-[#F3F5F7]"
+                  className="rounded-full px-4 py-2 text-sm font-bold text-[#5B6577] hover:bg-[#d4dee9]"
                 >
                   Cancel
                 </button>
@@ -1082,7 +1078,7 @@ function Field({
 }) {
   return (
     <label className={`block ${className}`}>
-      <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-[#8B95A5]">
+      <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-[#5B6577]">
         {label}
       </span>
       {children}

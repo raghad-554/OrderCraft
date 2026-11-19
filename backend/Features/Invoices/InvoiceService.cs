@@ -80,7 +80,7 @@ public class InvoiceService : IInvoiceService
         {
             OrganizationId = _tenant.RequireOrganizationId(),
             OrderId = request.OrderId,
-            Currency = InvoiceMoney.CurrencyCode,
+            Currency = await ResolveInvoiceCurrencyAsync(order, cancellationToken),
             IsDeleted = false
         };
         ApplyFields(invoice, request);
@@ -289,11 +289,23 @@ public class InvoiceService : IInvoiceService
     private static void ApplyFields(Invoice invoice, InvoiceRequestBase request)
     {
         invoice.InvoiceNumber = request.InvoiceNumber.Trim();
-        if (string.IsNullOrWhiteSpace(invoice.Currency))
-            invoice.Currency = InvoiceMoney.CurrencyCode;
         invoice.Amount = InvoiceMoney.Round(request.Amount);
         invoice.DueDate = NormalizeUtc(request.DueDate);
         invoice.Status = InvoiceMoney.Status(invoice);
+    }
+
+    private async Task<string> ResolveInvoiceCurrencyAsync(Order order, CancellationToken cancellationToken)
+    {
+        if (!string.IsNullOrWhiteSpace(order.Currency))
+            return order.Currency.Trim().ToUpperInvariant();
+
+        var orgId = _tenant.RequireOrganizationId();
+        var currency = await _dbContext.Organizations
+            .AsNoTracking()
+            .Where(o => o.Id == orgId)
+            .Select(o => o.DefaultCurrency)
+            .FirstOrDefaultAsync(cancellationToken);
+        return string.IsNullOrWhiteSpace(currency) ? "USD" : currency.Trim().ToUpperInvariant();
     }
 
     private static DateTime NormalizeUtc(DateTime value) =>

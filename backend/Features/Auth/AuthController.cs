@@ -12,10 +12,12 @@ namespace OrderCraft.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
+    private readonly IAuthCookieService _authCookies;
 
-    public AuthController(IAuthService authService)
+    public AuthController(IAuthService authService, IAuthCookieService authCookies)
     {
         _authService = authService;
+        _authCookies = authCookies;
     }
 
     [HttpPost("login")]
@@ -31,6 +33,9 @@ public class AuthController : ControllerBase
             return Unauthorized(new { message = "Invalid username or password" });
         }
 
+        _authCookies.SetAuthCookie(HttpContext, result.Token, request.RememberMe);
+        // Keep JWT in HttpOnly cookie only — do not expose it to browser JS.
+        result.Token = string.Empty;
         return Ok(result);
     }
 
@@ -39,6 +44,7 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> Logout(CancellationToken cancellationToken)
     {
         await _authService.LogoutAsync(cancellationToken);
+        _authCookies.ClearAuthCookie(HttpContext);
         return NoContent();
     }
 

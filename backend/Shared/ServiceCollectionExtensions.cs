@@ -19,6 +19,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IPasswordService, PasswordService>();
         services.AddScoped<IJwtTokenService, JwtTokenService>();
         services.AddScoped<ITokenRevocationService, TokenRevocationService>();
+        services.AddSingleton<IAuthCookieService, AuthCookieService>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IPermissionService, PermissionService>();

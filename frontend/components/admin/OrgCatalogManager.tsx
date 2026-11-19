@@ -156,11 +156,11 @@ export default function OrgCatalogManager({
         </div>
       ) : null}
 
-      <section className="rounded-[24px] border border-black/[0.04] bg-white p-5">
+      <section className="rounded-[24px] border border-black/[0.04] bg-[#e4ebf2] p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-base font-bold text-[#0B1220]">Departments</h2>
-            <p className="mt-1 text-sm font-medium text-[#8B95A5]">
+            <p className="mt-1 text-sm font-semibold text-[#5B6577]">
               Each department has default page access. New employees in that department receive
               those permissions automatically.
             </p>
@@ -176,9 +176,9 @@ export default function OrgCatalogManager({
 
         <ul className="mt-4 divide-y divide-black/[0.04]">
           {loading ? (
-            <li className="py-6 text-sm font-medium text-[#8B95A5]">Loading departments…</li>
+            <li className="py-6 text-sm font-semibold text-[#5B6577]">Loading departments…</li>
           ) : departments.length === 0 ? (
-            <li className="py-6 text-sm font-medium text-[#8B95A5]">No departments yet.</li>
+            <li className="py-6 text-sm font-semibold text-[#5B6577]">No departments yet.</li>
           ) : (
             departments.map((department) => (
               <li key={department.id} className="flex items-start justify-between gap-3 py-3">
@@ -186,12 +186,12 @@ export default function OrgCatalogManager({
                   <p className="font-semibold text-[#0B1220]">
                     {department.name}
                     {!department.isActive ? (
-                      <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-500">
+                      <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-600">
                         Inactive
                       </span>
                     ) : null}
                   </p>
-                  <p className="mt-0.5 text-xs font-medium text-[#8B95A5]">
+                  <p className="mt-0.5 text-xs font-semibold text-[#5B6577]">
                     {department.memberCount}{" "}
                     {department.memberCount === 1 ? "employee" : "employees"}
                     {" · "}

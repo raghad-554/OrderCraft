@@ -67,6 +67,10 @@ public class Order
     [Column(TypeName = "numeric(18,2)")]
     public decimal TotalAmount { get; set; }
 
+    /// <summary>ISO 4217 code snapped from the org default when the order was created.</summary>
+    [MaxLength(3)]
+    public string? Currency { get; set; }
+
     public DateTime OrderDate { get; set; } = DateTime.UtcNow;
 
     public DateTime? DeliveryDate { get; set; }

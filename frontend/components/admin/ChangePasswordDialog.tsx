@@ -7,7 +7,7 @@ import { clearSession } from "@/lib/auth";
 import { changeOwnPassword } from "@/lib/employees";
 
 const fieldClass =
-  "w-full rounded-2xl border border-black/[0.06] bg-[#F3F5F7] px-3.5 py-2.5 text-sm font-medium text-[#0B1220] outline-none focus:bg-white focus:ring-2 focus:ring-[#051A2D]/30";
+  "w-full rounded-2xl border border-black/[0.06] bg-[#d4dee9] px-3.5 py-2.5 text-sm font-medium text-[#0B1220] outline-none focus:bg-[#e4ebf2] focus:ring-2 focus:ring-[#051A2D]/30";
 
 export default function ChangePasswordDialog({
   open,
@@ -76,9 +76,9 @@ export default function ChangePasswordDialog({
         className="absolute inset-0 bg-[#051A2D]/55"
         onClick={close}
       />
-      <div className="relative z-10 w-full max-w-md rounded-[28px] bg-white p-6 shadow-2xl sm:p-7">
+      <div className="relative z-10 w-full max-w-md rounded-[28px] bg-[#e4ebf2] p-6 shadow-2xl sm:p-7">
         <h2 className="text-xl font-bold text-[#0B1220]">Change password</h2>
-        <p className="mt-1 text-sm font-medium text-[#8B95A5]">
+        <p className="mt-1 text-sm font-semibold text-[#5B6577]">
           This password is only for the organization you are in now. Other organizations keep their own passwords.
         </p>
         {done ? (
@@ -108,7 +108,7 @@ export default function ChangePasswordDialog({
               </div>
             ) : null}
             <label className="block">
-              <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-[#8B95A5]">
+              <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-[#5B6577]">
                 Current password *
               </span>
               <input
@@ -125,7 +125,7 @@ export default function ChangePasswordDialog({
               />
             </label>
             <label className="block">
-              <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-[#8B95A5]">
+              <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-[#5B6577]">
                 New password *
               </span>
               <input
@@ -142,7 +142,7 @@ export default function ChangePasswordDialog({
               />
             </label>
             <label className="block">
-              <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-[#8B95A5]">
+              <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-[#5B6577]">
                 Confirm new password *
               </span>
               <input
@@ -163,7 +163,7 @@ export default function ChangePasswordDialog({
                 type="button"
                 onClick={close}
                 disabled={saving}
-                className="rounded-full px-4 py-2 text-sm font-bold text-[#8B95A5] hover:bg-[#F3F5F7]"
+                className="rounded-full px-4 py-2 text-sm font-bold text-[#5B6577] hover:bg-[#d4dee9]"
               >
                 Cancel
               </button>

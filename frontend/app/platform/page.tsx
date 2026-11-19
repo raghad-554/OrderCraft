@@ -124,7 +124,7 @@ export default function PlatformOrganizationsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-[#051A2D]">Organizations</h1>
-        <p className="mt-1 text-sm font-medium text-[#8B95A5]">
+        <p className="mt-1 text-sm font-semibold text-[#5B6577]">
           Add a tenant, set its modules, and issue the first organization admin login.
         </p>
       </div>
@@ -133,38 +133,38 @@ export default function PlatformOrganizationsPage() {
         <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{error}</p>
       ) : null}
 
-      <form onSubmit={(e) => void onCreate(e)} className="space-y-4 rounded-[24px] bg-white p-5 shadow-sm">
+      <form onSubmit={(e) => void onCreate(e)} className="space-y-4 rounded-[24px] bg-[#e4ebf2] p-5 shadow-sm">
         <h2 className="text-sm font-bold text-[#051A2D]">New organization</h2>
         <div className="grid gap-3 sm:grid-cols-2">
-          <label className="text-xs font-semibold text-[#8B95A5]">
+          <label className="text-xs font-semibold text-[#5B6577]">
             Organization name
             <input
               required
               value={createForm.name}
               onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
-              className="mt-1 w-full rounded-2xl bg-[#F3F5F7] px-3 py-2.5 text-sm font-medium text-[#051A2D] outline-none"
+              className="mt-1 w-full rounded-2xl bg-[#d4dee9] px-3 py-2.5 text-sm font-medium text-[#051A2D] outline-none"
             />
           </label>
-          <label className="text-xs font-semibold text-[#8B95A5]">
+          <label className="text-xs font-semibold text-[#5B6577]">
             Contact email
             <input
               type="email"
               value={createForm.contactEmail}
               onChange={(e) => setCreateForm({ ...createForm, contactEmail: e.target.value })}
-              className="mt-1 w-full rounded-2xl bg-[#F3F5F7] px-3 py-2.5 text-sm font-medium text-[#051A2D] outline-none"
+              className="mt-1 w-full rounded-2xl bg-[#d4dee9] px-3 py-2.5 text-sm font-medium text-[#051A2D] outline-none"
             />
           </label>
-          <label className="text-xs font-semibold text-[#8B95A5]">
+          <label className="text-xs font-semibold text-[#5B6577]">
             Contact phone
             <input
               value={createForm.contactPhone}
               onChange={(e) => setCreateForm({ ...createForm, contactPhone: e.target.value })}
-              className="mt-1 w-full rounded-2xl bg-[#F3F5F7] px-3 py-2.5 text-sm font-medium text-[#051A2D] outline-none"
+              className="mt-1 w-full rounded-2xl bg-[#d4dee9] px-3 py-2.5 text-sm font-medium text-[#051A2D] outline-none"
             />
           </label>
         </div>
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#8B95A5]">Modules</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-[#5B6577]">Modules</p>
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
             {pages.map((page) => (
               <label key={page.key} className="flex items-start gap-2 text-sm font-medium text-[#051A2D]">
@@ -176,43 +176,43 @@ export default function PlatformOrganizationsPage() {
                 />
                 <span>
                   {page.label}
-                  <span className="block text-xs font-medium text-[#8B95A5]">{page.description}</span>
+                  <span className="block text-xs font-semibold text-[#5B6577]">{page.description}</span>
                 </span>
               </label>
             ))}
           </div>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
-          <label className="text-xs font-semibold text-[#8B95A5]">
+          <label className="text-xs font-semibold text-[#5B6577]">
             Admin username
             <input
               required
               value={createForm.adminUsername}
               onChange={(e) => setCreateForm({ ...createForm, adminUsername: e.target.value })}
-              className="mt-1 w-full rounded-2xl bg-[#F3F5F7] px-3 py-2.5 text-sm font-medium text-[#051A2D] outline-none"
+              className="mt-1 w-full rounded-2xl bg-[#d4dee9] px-3 py-2.5 text-sm font-medium text-[#051A2D] outline-none"
             />
           </label>
-          <label className="text-xs font-semibold text-[#8B95A5]">
+          <label className="text-xs font-semibold text-[#5B6577]">
             Admin full name (four parts)
             <input
               required
               value={createForm.adminFullName}
               onChange={(e) => setCreateForm({ ...createForm, adminFullName: e.target.value })}
               placeholder="First Second Third Family"
-              className="mt-1 w-full rounded-2xl bg-[#F3F5F7] px-3 py-2.5 text-sm font-medium text-[#051A2D] outline-none"
+              className="mt-1 w-full rounded-2xl bg-[#d4dee9] px-3 py-2.5 text-sm font-medium text-[#051A2D] outline-none"
             />
           </label>
-          <label className="text-xs font-semibold text-[#8B95A5]">
+          <label className="text-xs font-semibold text-[#5B6577]">
             Admin email
             <input
               required
               type="email"
               value={createForm.adminEmail}
               onChange={(e) => setCreateForm({ ...createForm, adminEmail: e.target.value })}
-              className="mt-1 w-full rounded-2xl bg-[#F3F5F7] px-3 py-2.5 text-sm font-medium text-[#051A2D] outline-none"
+              className="mt-1 w-full rounded-2xl bg-[#d4dee9] px-3 py-2.5 text-sm font-medium text-[#051A2D] outline-none"
             />
           </label>
-          <label className="text-xs font-semibold text-[#8B95A5]">
+          <label className="text-xs font-semibold text-[#5B6577]">
             Admin password
             <input
               required
@@ -220,7 +220,7 @@ export default function PlatformOrganizationsPage() {
               minLength={6}
               value={createForm.adminPassword}
               onChange={(e) => setCreateForm({ ...createForm, adminPassword: e.target.value })}
-              className="mt-1 w-full rounded-2xl bg-[#F3F5F7] px-3 py-2.5 text-sm font-medium text-[#051A2D] outline-none"
+              className="mt-1 w-full rounded-2xl bg-[#d4dee9] px-3 py-2.5 text-sm font-medium text-[#051A2D] outline-none"
             />
           </label>
         </div>
@@ -234,28 +234,31 @@ export default function PlatformOrganizationsPage() {
       </form>
 
       <div className="space-y-3">
-        {loading ? <p className="text-sm text-[#8B95A5]">Loading…</p> : null}
+        {loading ? <p className="text-sm text-[#5B6577]">Loading…</p> : null}
         {orgs.map((org) => (
-          <div key={org.id} className="rounded-[24px] bg-white p-5 shadow-sm">
+          <div
+            key={org.id}
+            className="rounded-[24px] border border-transparent bg-[#e4ebf2] p-5 shadow-sm transition hover:border-[#051A2D]/20 hover:bg-[#d4dee9]"
+          >
             {editingId === org.id ? (
               <form onSubmit={(e) => void onSaveEdit(e)} className="space-y-3">
                 <input
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
-                  className="w-full rounded-2xl bg-[#F3F5F7] px-3 py-2.5 text-sm font-medium"
+                  className="w-full rounded-2xl bg-[#d4dee9] px-3 py-2.5 text-sm font-medium"
                 />
                 <div className="grid gap-3 sm:grid-cols-2">
                   <input
                     value={editEmail}
                     onChange={(e) => setEditEmail(e.target.value)}
                     placeholder="Contact email"
-                    className="rounded-2xl bg-[#F3F5F7] px-3 py-2.5 text-sm font-medium"
+                    className="rounded-2xl bg-[#d4dee9] px-3 py-2.5 text-sm font-medium"
                   />
                   <input
                     value={editPhone}
                     onChange={(e) => setEditPhone(e.target.value)}
                     placeholder="Contact phone"
-                    className="rounded-2xl bg-[#F3F5F7] px-3 py-2.5 text-sm font-medium"
+                    className="rounded-2xl bg-[#d4dee9] px-3 py-2.5 text-sm font-medium"
                   />
                 </div>
                 <label className="flex items-center gap-2 text-sm font-medium">
@@ -289,7 +292,7 @@ export default function PlatformOrganizationsPage() {
                   <button
                     type="button"
                     onClick={() => setEditingId(null)}
-                    className="rounded-full px-4 py-2 text-xs font-bold text-[#8B95A5]"
+                    className="rounded-full px-4 py-2 text-xs font-bold text-[#5B6577]"
                   >
                     Cancel
                   </button>
@@ -299,17 +302,17 @@ export default function PlatformOrganizationsPage() {
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="text-base font-bold text-[#051A2D]">{org.name}</p>
-                  <p className="text-xs font-medium text-[#8B95A5]">
+                  <p className="text-xs font-semibold text-[#5B6577]">
                     {org.slug} · {org.isActive ? "Active" : "Inactive"} · {org.memberCount} members
                   </p>
-                  <p className="mt-2 text-xs text-[#8B95A5]">
+                  <p className="mt-2 text-xs text-[#5B6577]">
                     Modules: {org.enabledPageKeys.join(", ") || "default"}
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => startEdit(org)}
-                  className="rounded-full bg-[#F3F5F7] px-4 py-2 text-xs font-bold text-[#051A2D]"
+                  className="rounded-full bg-[#d4dee9] px-4 py-2 text-xs font-bold text-[#051A2D]"
                 >
                   Edit
                 </button>

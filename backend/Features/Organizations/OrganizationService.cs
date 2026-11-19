@@ -588,15 +588,11 @@ public class OrganizationService : IOrganizationService
         if (orgId is null)
             return null;
 
-        var threshold = await _dbContext.Organizations
+        var org = await _dbContext.Organizations
             .AsNoTracking()
-            .Where(o => o.Id == orgId)
-            .Select(o => (decimal?)o.ApprovalThreshold)
-            .FirstOrDefaultAsync(cancellationToken);
+            .FirstOrDefaultAsync(o => o.Id == orgId, cancellationToken);
 
-        return threshold is null
-            ? null
-            : new OrganizationSettingsResponse { ApprovalThreshold = threshold.Value };
+        return org is null ? null : ToSettingsResponse(org);
     }
 
     public async Task<(OrganizationSettingsResponse? Settings, string? Error)> UpdateSettingsAsync(
@@ -604,7 +600,7 @@ public class OrganizationService : IOrganizationService
         CancellationToken cancellationToken = default)
     {
         if (!_tenant.IsOrgAdmin)
-            return (null, "Only an organization admin can change the approval threshold.");
+            return (null, "Only an organization admin can change organization settings.");
 
         var orgId = _tenant.RequireOrganizationId();
         var org = await _dbContext.Organizations
@@ -612,7 +608,21 @@ public class OrganizationService : IOrganizationService
         if (org is null)
             return (null, "Organization not found.");
 
+        org.Name = request.Name.Trim();
+        org.ContactEmail = string.IsNullOrWhiteSpace(request.ContactEmail)
+            ? null
+            : request.ContactEmail.Trim();
+        org.ContactPhone = string.IsNullOrWhiteSpace(request.ContactPhone)
+            ? null
+            : request.ContactPhone.Trim();
+        org.LogoUrl = string.IsNullOrWhiteSpace(request.LogoUrl)
+            ? null
+            : request.LogoUrl.Trim();
+        org.DefaultCurrency = request.DefaultCurrency.Trim().ToUpperInvariant();
+        org.DefaultTaxRate = Math.Round(request.DefaultTaxRate, 2, MidpointRounding.AwayFromZero);
+        org.DefaultPaymentTerms = request.DefaultPaymentTerms;
         org.ApprovalThreshold = Math.Round(request.ApprovalThreshold, 2, MidpointRounding.AwayFromZero);
+
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         await _auditService.RecordAsync(
@@ -620,11 +630,26 @@ public class OrganizationService : IOrganizationService
             entityType: "Organization",
             entityId: org.Id.ToString(),
             entityLabel: org.Name,
-            summary: $"Approval threshold set to {org.ApprovalThreshold:0.00}.",
+            summary:
+                $"Updated organization settings (threshold {org.ApprovalThreshold:0.00}, tax {org.DefaultTaxRate:0.##}%, {org.DefaultCurrency}, {org.DefaultPaymentTerms}).",
             cancellationToken: cancellationToken);
 
-        return (new OrganizationSettingsResponse { ApprovalThreshold = org.ApprovalThreshold }, null);
+        return (ToSettingsResponse(org), null);
     }
+
+    private static OrganizationSettingsResponse ToSettingsResponse(Organization org) =>
+        new()
+        {
+            Name = org.Name,
+            Slug = org.Slug,
+            ContactEmail = org.ContactEmail,
+            ContactPhone = org.ContactPhone,
+            LogoUrl = org.LogoUrl,
+            DefaultCurrency = org.DefaultCurrency,
+            DefaultTaxRate = org.DefaultTaxRate,
+            DefaultPaymentTerms = org.DefaultPaymentTerms,
+            ApprovalThreshold = org.ApprovalThreshold
+        };
 
     private static OrganizationSummary ToSummary(OrganizationMembership membership, Organization? org = null)
     {

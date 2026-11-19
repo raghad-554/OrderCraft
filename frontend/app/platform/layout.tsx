@@ -43,18 +43,18 @@ export default function PlatformLayout({
 
   return (
     <div className="min-h-screen bg-[#051A2D] p-2 sm:p-3 lg:p-4">
-      <div className="mx-auto flex min-h-[calc(100vh-2rem)] max-w-6xl flex-col overflow-hidden rounded-[28px] bg-[#F4F6F8]">
+      <div className="mx-auto flex min-h-[calc(100vh-2rem)] max-w-6xl flex-col overflow-hidden rounded-[28px] bg-[#c5d2e0]">
         <header className="flex items-center justify-between border-b border-black/[0.04] px-6 py-4">
           <div>
             <p className="text-sm font-bold text-[#051A2D]">OrderCraft Platform</p>
-            <p className="text-xs font-medium text-[#8B95A5]">Create organizations and enable modules</p>
+            <p className="text-xs font-semibold text-[#5B6577]">Create organizations and enable modules</p>
           </div>
           <div className="flex items-center gap-3">
             <p className="text-xs font-semibold text-[#051A2D]">{name}</p>
             <button
               type="button"
               onClick={() => setChangePasswordOpen(true)}
-              className="rounded-full bg-white px-4 py-2 text-xs font-bold text-[#051A2D] ring-1 ring-black/[0.08]"
+              className="rounded-full bg-[#e4ebf2] px-4 py-2 text-xs font-bold text-[#051A2D] ring-1 ring-black/[0.08]"
             >
               Change password
             </button>

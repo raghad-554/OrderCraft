@@ -1,4 +1,5 @@
 import { apiFetch, newIdempotencyKey } from "@/lib/api";
+import { formatOrgMoney } from "@/lib/money";
 
 export type InvoiceStatus = "Paid" | "Unpaid" | "PartiallyPaid" | "Overdue";
 
@@ -99,12 +100,8 @@ export function toCents(value: number) {
   return Math.round((Number.isFinite(value) ? value : 0) * 100);
 }
 
-export function formatInvoiceMoney(value: number, currency = "USD") {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 2,
-  }).format(value);
+export function formatInvoiceMoney(value: number, currency?: string | null) {
+  return formatOrgMoney(value, currency);
 }
 
 export function toDateInputValue(value?: string | Date) {

@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import ScrollSelect from "@/components/ui/ScrollSelect";
 import { ApiError } from "@/lib/api";
 import {
   employeeUpdatePayload,
@@ -11,7 +12,7 @@ import {
 import type { OrganizationDepartment } from "@/lib/org-catalog";
 
 const fieldClass =
-  "w-full rounded-2xl border border-black/[0.06] bg-[#F3F5F7] px-3.5 py-2.5 text-sm font-medium text-[#0B1220] outline-none focus:bg-white focus:ring-2 focus:ring-[#051A2D]/30";
+  "w-full rounded-2xl border border-black/[0.06] bg-[#d4dee9] px-3.5 py-2.5 text-sm font-medium text-[#0B1220] outline-none focus:bg-[#e4ebf2] focus:ring-2 focus:ring-[#051A2D]/30";
 
 export default function ReassignDepartmentDialog({
   department,
@@ -137,11 +138,11 @@ export default function ReassignDepartmentDialog({
           if (!saving) onClose();
         }}
       />
-      <div className="relative z-10 max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-[28px] bg-white p-6 shadow-2xl sm:p-7">
+      <div className="relative z-10 max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-[28px] bg-[#e4ebf2] p-6 shadow-2xl sm:p-7">
         <div className="mb-5 flex items-start justify-between gap-3">
           <div>
             <h2 className="text-xl font-bold text-[#0B1220]">Move employees</h2>
-            <p className="mt-1 text-sm font-medium text-[#8B95A5]">
+            <p className="mt-1 text-sm font-semibold text-[#5B6577]">
               Reassign people in {department.name} before you {intent} it. Their page access will
               follow the new department defaults.
             </p>
@@ -150,7 +151,7 @@ export default function ReassignDepartmentDialog({
             type="button"
             onClick={onClose}
             disabled={saving}
-            className="rounded-full px-3 py-1 text-sm font-bold text-[#8B95A5] hover:bg-[#F3F5F7] disabled:opacity-50"
+            className="rounded-full px-3 py-1 text-sm font-bold text-[#5B6577] hover:bg-[#d4dee9] disabled:opacity-50"
           >
             Close
           </button>
@@ -158,23 +159,23 @@ export default function ReassignDepartmentDialog({
 
         <form onSubmit={(e) => void onSubmit(e)} className="space-y-4">
           {destinations.length > 0 && members.length > 0 ? (
-            <div className="rounded-[20px] border border-black/[0.04] bg-[#F8FAFB] p-4">
+            <div className="rounded-[20px] border border-black/[0.04] bg-[#e8eef4] p-4">
               <label className="block">
-                <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-[#8B95A5]">
+                <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-[#5B6577]">
                   Move all to
                 </span>
-                <select
+                <ScrollSelect
                   value={moveAllTo}
-                  onChange={(e) => applyMoveAll(e.target.value)}
+                  placeholder="Select department"
+                  options={destinations.map((item) => ({
+                    value: item.id,
+                    label: item.name,
+                  }))}
+                  onChange={applyMoveAll}
                   className={fieldClass}
                   disabled={saving}
-                >
-                  {destinations.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.name}
-                    </option>
-                  ))}
-                </select>
+                  allowEmpty={false}
+                />
               </label>
               <button
                 type="button"
@@ -188,9 +189,9 @@ export default function ReassignDepartmentDialog({
           ) : null}
 
           {loading ? (
-            <p className="py-6 text-sm font-medium text-[#8B95A5]">Loading employees…</p>
+            <p className="py-6 text-sm font-semibold text-[#5B6577]">Loading employees…</p>
           ) : members.length === 0 ? (
-            <p className="py-6 text-sm font-medium text-[#8B95A5]">
+            <p className="py-6 text-sm font-semibold text-[#5B6577]">
               No employees are assigned to this department now.
             </p>
           ) : destinations.length === 0 ? (
@@ -199,7 +200,7 @@ export default function ReassignDepartmentDialog({
             </p>
           ) : (
             <div>
-              <p className="mb-2 text-xs font-bold uppercase tracking-wide text-[#8B95A5]">
+              <p className="mb-2 text-xs font-bold uppercase tracking-wide text-[#5B6577]">
                 Or choose a department for each person
               </p>
               <ul className="divide-y divide-black/[0.04] rounded-[20px] border border-black/[0.04]">
@@ -210,23 +211,24 @@ export default function ReassignDepartmentDialog({
                   >
                     <div className="min-w-0 flex-1">
                       <p className="font-semibold text-[#0B1220]">{employee.fullName}</p>
-                      <p className="mt-0.5 text-xs font-medium text-[#8B95A5]">{employee.email}</p>
+                      <p className="mt-0.5 text-xs font-semibold text-[#5B6577]">{employee.email}</p>
                     </div>
-                    <select
-                      value={targets[employee.id] ?? ""}
-                      onChange={(e) =>
-                        setTargets((prev) => ({ ...prev, [employee.id]: e.target.value }))
-                      }
-                      className={`${fieldClass} sm:max-w-[220px]`}
-                      disabled={saving}
-                      aria-label={`New department for ${employee.fullName}`}
-                    >
-                      {destinations.map((item) => (
-                        <option key={item.id} value={item.id}>
-                          {item.name}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="sm:max-w-[220px] sm:flex-1">
+                      <ScrollSelect
+                        value={targets[employee.id] ?? ""}
+                        placeholder="Select department"
+                        options={destinations.map((item) => ({
+                          value: item.id,
+                          label: item.name,
+                        }))}
+                        onChange={(next) =>
+                          setTargets((prev) => ({ ...prev, [employee.id]: next }))
+                        }
+                        className={fieldClass}
+                        disabled={saving}
+                        allowEmpty={false}
+                      />
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -244,7 +246,7 @@ export default function ReassignDepartmentDialog({
               type="button"
               onClick={onClose}
               disabled={saving}
-              className="rounded-full px-4 py-2.5 text-sm font-bold text-[#8B95A5] hover:bg-[#F3F5F7] disabled:opacity-50"
+              className="rounded-full px-4 py-2.5 text-sm font-bold text-[#5B6577] hover:bg-[#d4dee9] disabled:opacity-50"
             >
               Cancel
             </button>

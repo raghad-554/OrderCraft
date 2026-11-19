@@ -67,6 +67,7 @@ public class ProductService : IProductService
         {
             OrganizationId = _tenant.RequireOrganizationId(),
             CompanyId = request.CompanyId,
+            Currency = await CurrentOrgCurrencyAsync(cancellationToken),
             IsDeleted = false
         };
         ApplyFields(product, request);
@@ -226,5 +227,16 @@ public class ProductService : IProductService
         return await query.AnyAsync(p => p.SKU.ToLower() == normalized, cancellationToken)
             ? "SKU already exists for this vendor."
             : null;
+    }
+
+    private async Task<string> CurrentOrgCurrencyAsync(CancellationToken cancellationToken)
+    {
+        var orgId = _tenant.RequireOrganizationId();
+        var currency = await _dbContext.Organizations
+            .AsNoTracking()
+            .Where(o => o.Id == orgId)
+            .Select(o => o.DefaultCurrency)
+            .FirstOrDefaultAsync(cancellationToken);
+        return string.IsNullOrWhiteSpace(currency) ? "USD" : currency.Trim().ToUpperInvariant();
     }
 }

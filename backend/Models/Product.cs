@@ -34,6 +34,10 @@ public class Product
     [Column(TypeName = "numeric(18,2)")]
     public decimal Price { get; set; }
 
+    /// <summary>ISO 4217 code snapped from the org default when the product was created.</summary>
+    [MaxLength(3)]
+    public string? Currency { get; set; }
+
     [Required]
     public int StockQuantity { get; set; }
 

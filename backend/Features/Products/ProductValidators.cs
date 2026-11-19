@@ -34,6 +34,7 @@ public class ProductResponse
     public string? Description { get; set; }
     public string SKU { get; set; } = string.Empty;
     public decimal Price { get; set; }
+    public string? Currency { get; set; }
     public int StockQuantity { get; set; }
     public bool IsActive { get; set; }
 }

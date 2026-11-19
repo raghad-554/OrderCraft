@@ -9,11 +9,15 @@ import {
   useMemo,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
+import ScrollSelect from "@/components/ui/ScrollSelect";
 import { ApiError } from "@/lib/api";
 import { canViewOrderFinancialHistory, getSession, isAdmin } from "@/lib/auth";
 import { listCompanies, type Company } from "@/lib/companies";
+import { getOrgCurrency, setOrgCurrency, subscribeOrgCurrency } from "@/lib/money";
+import { getOrganizationSettings } from "@/lib/organizations";
 import { canEditPage } from "@/lib/permissions";
 import {
   type OrderDirection,
@@ -54,7 +58,7 @@ import { listProducts, type Product } from "@/lib/products";
 type ViewMode = "kanban" | "table";
 
 const fieldClass =
-  "w-full rounded-2xl border border-black/[0.06] bg-[#F3F5F7] px-3.5 py-2.5 text-sm font-medium text-[#0B1220] outline-none focus:bg-white focus:ring-2 focus:ring-[#051A2D]/30";
+  "w-full rounded-2xl border border-black/[0.06] bg-[#d4dee9] px-3.5 py-2.5 text-sm font-medium text-[#0B1220] outline-none focus:bg-[#e4ebf2] focus:ring-2 focus:ring-[#051A2D]/30";
 
 type LineForm = {
   productId: string;
@@ -351,6 +355,33 @@ function lineAmounts(line: LineForm) {
   return { gross, discount, total: roundMoney(gross - discount) };
 }
 
+/** Sales orders cannot request more than available company stock (aggregated per product). */
+function saleStockError(
+  direction: OrderDirection,
+  lines: LineForm[],
+  catalog: Product[],
+): string | null {
+  if (direction !== "Sale") return null;
+
+  const qtyByProduct = new Map<string, number>();
+  for (const line of lines) {
+    if (!line.productId) continue;
+    const qty = Number(line.quantity);
+    if (!Number.isInteger(qty) || qty <= 0) continue;
+    qtyByProduct.set(line.productId, (qtyByProduct.get(line.productId) ?? 0) + qty);
+  }
+
+  for (const [productId, qty] of qtyByProduct) {
+    const product = catalog.find((p) => p.id === productId);
+    if (!product) continue;
+    if (qty > product.stockQuantity) {
+      return `Not enough stock for '${product.name}'.`;
+    }
+  }
+
+  return null;
+}
+
 function orderDiscount(order: PurchaseOrder) {
   if (order.discountTotal != null) return Number(order.discountTotal);
   return (order.orderItems ?? []).reduce(
@@ -488,6 +519,10 @@ export default function PurchaseOrderBoard() {
   const [deliveryDate, setDeliveryDate] = useState("");
   const [paymentTerms, setPaymentTerms] = useState<PaymentTerms>("Net30");
   const [taxRate, setTaxRate] = useState("0");
+  const [defaultPaymentTerms, setDefaultPaymentTerms] =
+    useState<PaymentTerms>("Net30");
+  const [defaultTaxRate, setDefaultTaxRate] = useState("0");
+  const [orgCurrency, setOrgCurrencyState] = useState(getOrgCurrency);
   const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<LineForm[]>([emptyLine()]);
   const [rejectTarget, setRejectTarget] = useState<PurchaseOrder | null>(null);
@@ -495,18 +530,35 @@ export default function PurchaseOrderBoard() {
   const [rejectError, setRejectError] = useState<string | null>(null);
   const [rejectSaving, setRejectSaving] = useState(false);
 
+  useEffect(() => subscribeOrgCurrency(setOrgCurrencyState), []);
+
+  function money(value: number, recordCurrency?: string | null) {
+    return formatMoney(value, recordCurrency || orgCurrency);
+  }
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [orderRows, companyRows, productRows] = await Promise.all([
+      const [orderRows, companyRows, productRows, orgSettings] = await Promise.all([
         listOrders(),
         listCompanies(),
         listProducts(),
+        getOrganizationSettings().catch(() => null),
       ]);
       setOrders(orderRows);
       setCompanies(companyRows);
       setProducts(productRows.filter((p) => p.isActive));
+      if (orgSettings) {
+        const terms = orgSettings.defaultPaymentTerms || "Net30";
+        const rate = String(Number(orgSettings.defaultTaxRate || 0));
+        setDefaultPaymentTerms(terms);
+        setDefaultTaxRate(rate);
+        if (orgSettings.defaultCurrency) {
+          setOrgCurrency(orgSettings.defaultCurrency);
+          setOrgCurrencyState(orgSettings.defaultCurrency);
+        }
+      }
     } catch (err) {
       setError(
         err instanceof ApiError
@@ -558,10 +610,13 @@ export default function PurchaseOrderBoard() {
   );
   const partners = direction === "Sale" ? buyers : vendors;
   const lineProducts = useMemo(() => {
+    // PO: that vendor's products. SO: your org catalog (not filtered by client).
     const scoped =
       direction === "Purchase"
-        ? products.filter((p) => p.companyId === partnerCompanyId)
-        : products;
+        ? products.filter(
+            (p) => p.isActive && p.companyId === partnerCompanyId,
+          )
+        : products.filter((p) => p.isActive);
     // Keep selected line products visible while editing even if catalog filter changes.
     const selectedIds = new Set(
       lines.map((line) => line.productId).filter(Boolean),
@@ -572,6 +627,11 @@ export default function PurchaseOrderBoard() {
     );
     return missing.length ? [...scoped, ...missing] : scoped;
   }, [direction, products, partnerCompanyId, lines]);
+
+  const liveSaleStockError = useMemo(
+    () => saleStockError(direction, lines, products),
+    [direction, lines, products],
+  );
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -605,6 +665,16 @@ export default function PurchaseOrderBoard() {
     document.addEventListener("mousedown", onPointerDown);
     return () => document.removeEventListener("mousedown", onPointerDown);
   }, [menuOpenId]);
+
+  useEffect(() => {
+    const anyOpen = modalOpen || !!detailOrder || !!rejectTarget;
+    if (!anyOpen) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [modalOpen, detailOrder, rejectTarget]);
 
   useEffect(() => {
     if (!detailOrder) return;
@@ -752,8 +822,8 @@ export default function PurchaseOrderBoard() {
     setOrderNumber(nextOrderNumber("Purchase"));
     setPartnerCompanyId("");
     setDeliveryDate(toDateInputValue(new Date(Date.now() + 14 * 86400000)));
-    setPaymentTerms("Net30");
-    setTaxRate("0");
+    setPaymentTerms(defaultPaymentTerms);
+    setTaxRate(defaultTaxRate);
     setNotes("");
     setLines([emptyLine()]);
     setFormError(null);
@@ -849,6 +919,10 @@ export default function PurchaseOrderBoard() {
         setFormError("Selected product was not found.");
         return;
       }
+      if (!product.isActive) {
+        setFormError(`Product '${product.name}' is inactive.`);
+        return;
+      }
       if (direction === "Purchase" && product.companyId !== partnerCompanyId) {
         setFormError("Products must belong to the selected vendor.");
         return;
@@ -865,6 +939,15 @@ export default function PurchaseOrderBoard() {
     if (orderItems.length === 0) {
       setFormError("Add at least one product line.");
       return;
+    }
+
+    // SO only: block submit when requested qty exceeds company stock.
+    if (status === "Pending") {
+      const stockMessage = saleStockError(direction, lines, products);
+      if (stockMessage) {
+        setFormError(stockMessage);
+        return;
+      }
     }
 
     if (
@@ -1114,14 +1197,14 @@ export default function PurchaseOrderBoard() {
                 Add order
               </button>
             ) : null}
-            <div className="flex rounded-full bg-white p-1 ring-1 ring-black/[0.06]">
+            <div className="flex rounded-full bg-[#e4ebf2] p-1 ring-1 ring-black/[0.06]">
               <button
                 type="button"
                 onClick={() => setView("kanban")}
                 className={`rounded-full px-4 py-2 text-sm font-bold transition ${
                   view === "kanban"
                     ? "bg-[#051A2D] text-white"
-                    : "text-[#051A2D] hover:bg-[#F8FAFB]"
+                    : "text-[#051A2D] hover:bg-[#d4dee9]"
                 }`}
               >
                 Board
@@ -1132,7 +1215,7 @@ export default function PurchaseOrderBoard() {
                 className={`rounded-full px-4 py-2 text-sm font-bold transition ${
                   view === "table"
                     ? "bg-[#051A2D] text-white"
-                    : "text-[#051A2D] hover:bg-[#F8FAFB]"
+                    : "text-[#051A2D] hover:bg-[#d4dee9]"
                 }`}
               >
                 Table
@@ -1145,7 +1228,7 @@ export default function PurchaseOrderBoard() {
       <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="All orders" value={String(totals.count)} />
         <StatCard label="Open pipeline" value={String(totals.open)} />
-        <StatCard label="Open value" value={formatMoney(totals.amount)} />
+        <StatCard label="Open value" value={money(totals.amount)} />
         <StatCard
           label="Pending approvals"
           value={String(totals.pending)}
@@ -1164,37 +1247,35 @@ export default function PurchaseOrderBoard() {
               syncOrderFilters(next, statusFilter);
             }}
             placeholder="Search by order number, buyer, or vendor…"
-            className="w-full rounded-2xl border border-black/[0.06] bg-white px-4 py-2.5 text-sm font-medium text-[#0B1220] outline-none ring-[#051A2D]/30 placeholder:text-[#8B95A5] focus:ring-2"
+            className="w-full rounded-2xl border border-black/[0.06] bg-[#e4ebf2] px-4 py-2.5 text-sm font-medium text-[#0B1220] outline-none ring-[#051A2D]/30 placeholder:text-[#5B6577] focus:ring-2"
           />
         </label>
-        <label className="shrink-0">
+        <label className="min-w-[160px] shrink-0">
           <span className="sr-only">Filter by status</span>
-          <select
-            value={statusFilter}
-            onChange={(e) => {
-              const next = e.target.value as "All" | OrderStatus;
-              setStatusFilter(next);
-              syncOrderFilters(search, next);
+          <ScrollSelect
+            value={statusFilter === "All" ? "" : statusFilter}
+            placeholder="All statuses"
+            options={ORDER_STATUSES.map((status) => ({
+              value: status,
+              label: status,
+            }))}
+            onChange={(next) => {
+              const value = (next || "All") as "All" | OrderStatus;
+              setStatusFilter(value);
+              syncOrderFilters(search, value);
             }}
-            className="rounded-2xl border border-black/[0.06] bg-white px-4 py-2.5 text-sm font-bold text-[#051A2D] outline-none focus:ring-2 focus:ring-[#051A2D]/30"
-          >
-            <option value="All">All statuses</option>
-            {ORDER_STATUSES.map((status) => (
-              <option key={status} value={status}>
-                {status}
-              </option>
-            ))}
-          </select>
+            className="rounded-2xl border border-black/[0.06] bg-[#e4ebf2] px-4 py-2.5 text-sm font-bold text-[#051A2D] outline-none focus:ring-2 focus:ring-[#051A2D]/30"
+          />
         </label>
         <button
           type="button"
           onClick={onExport}
           disabled={loading || filtered.length === 0}
-          className="rounded-full border border-black/[0.08] bg-white px-4 py-2.5 text-sm font-bold text-[#051A2D] transition hover:bg-[#F8FAFB] disabled:opacity-50"
+          className="rounded-full border border-black/[0.08] bg-[#e4ebf2] px-4 py-2.5 text-sm font-bold text-[#051A2D] transition hover:bg-[#d4dee9] disabled:opacity-50"
         >
           Export Excel
         </button>
-        <p className="text-sm font-medium text-[#8B95A5]">
+        <p className="text-sm font-semibold text-[#5B6577]">
           {loading
             ? "Loading…"
             : `${filtered.length} shown${canEdit ? "" : " · view only"}`}
@@ -1208,7 +1289,7 @@ export default function PurchaseOrderBoard() {
       ) : null}
 
       {loading ? (
-        <div className="rounded-[24px] border border-black/[0.04] bg-white px-5 py-12 text-center text-sm text-[#8B95A5]">
+        <div className="rounded-[24px] border border-black/[0.04] bg-[#e4ebf2] px-5 py-12 text-center text-sm text-[#5B6577]">
           Loading orders…
         </div>
       ) : view === "kanban" ? (
@@ -1222,25 +1303,25 @@ export default function PurchaseOrderBoard() {
                 onDragOver={(e) => onDragOver(e, column.status)}
                 onDragLeave={() => setDropTarget((t) => (t === column.status ? null : t))}
                 onDrop={(e) => onDrop(e, column.status)}
-                className={`flex w-[260px] shrink-0 flex-col rounded-[24px] border bg-[#F8FAFB] transition ${
+                className={`flex w-[260px] shrink-0 flex-col rounded-[24px] border bg-[#e8eef4] transition ${
                   activeDrop
-                    ? "border-[#051A2D]/40 bg-white shadow-md"
+                    ? "border-[#051A2D]/40 bg-[#e4ebf2] shadow-md"
                     : "border-black/[0.04]"
                 }`}
               >
                 <header className="px-4 pb-2 pt-4">
                   <div className="flex items-center justify-between gap-2">
                     <h2 className="text-sm font-bold text-[#0B1220]">{column.label}</h2>
-                    <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-[#8B95A5] ring-1 ring-black/[0.06]">
+                    <span className="rounded-full bg-[#e4ebf2] px-2 py-0.5 text-xs font-bold text-[#5B6577] ring-1 ring-black/[0.06]">
                       {cards.length}
                     </span>
                   </div>
-                  <p className="mt-0.5 text-xs font-medium text-[#8B95A5]">{column.hint}</p>
+                  <p className="mt-0.5 text-xs font-semibold text-[#5B6577]">{column.hint}</p>
                 </header>
 
                 <div className="flex flex-1 flex-col gap-2 px-3 pb-3">
                   {cards.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed border-black/[0.08] px-3 py-8 text-center text-xs font-medium text-[#8B95A5]">
+                    <div className="rounded-2xl border border-dashed border-black/[0.08] px-3 py-8 text-center text-xs font-semibold text-[#5B6577]">
                       {canEdit ? "Drop orders here" : "No orders"}
                     </div>
                   ) : (
@@ -1255,7 +1336,7 @@ export default function PurchaseOrderBoard() {
                           draggable={canEdit}
                           onDragStart={(e) => onDragStart(e, order.id)}
                           onDragEnd={onDragEnd}
-                          className={`relative rounded-[18px] border border-black/[0.04] bg-white px-3.5 py-3 shadow-sm transition ${
+                          className={`relative rounded-[18px] border border-transparent bg-[#e4ebf2] px-3.5 py-3 shadow-sm transition hover:border-[#051A2D]/20 hover:bg-[#d4dee9] ${
                             canEdit ? "cursor-grab active:cursor-grabbing" : ""
                           } ${draggingId === order.id ? "opacity-50" : ""} ${
                             busyId === order.id ? "opacity-70" : ""
@@ -1266,7 +1347,7 @@ export default function PurchaseOrderBoard() {
                               <p className="truncate text-sm font-bold text-[#0B1220]">
                                 {order.orderNumber}
                               </p>
-                              <p className="mt-1 text-xs font-medium text-[#8B95A5]">
+                              <p className="mt-1 text-xs font-semibold text-[#5B6577]">
                                 {orderDirectionLabel(order.direction)} ·{" "}
                                 {orderPartiesLine(order)}
                               </p>
@@ -1289,11 +1370,11 @@ export default function PurchaseOrderBoard() {
                                 ···
                               </button>
                               {menuOpenId === order.id ? (
-                                <div className="absolute right-0 top-8 z-30 min-w-[180px] rounded-2xl border border-black/[0.06] bg-white p-1.5 shadow-lg ring-1 ring-black/5">
+                                <div className="absolute right-0 top-8 z-30 min-w-[180px] rounded-2xl border border-black/[0.06] bg-[#e4ebf2] p-1.5 shadow-lg ring-1 ring-black/5">
                                   <button
                                     type="button"
                                     onClick={() => openDetails(order)}
-                                    className="block w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-[#0B1220] hover:bg-[#F8FAFB]"
+                                    className="block w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-[#0B1220] hover:bg-[#d4dee9]"
                                   >
                                     View details
                                   </button>
@@ -1301,7 +1382,7 @@ export default function PurchaseOrderBoard() {
                                     <button
                                       type="button"
                                       onClick={() => openEditDraft(order)}
-                                      className="block w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-[#0B1220] hover:bg-[#F8FAFB]"
+                                      className="block w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-[#0B1220] hover:bg-[#d4dee9]"
                                     >
                                       {order.status === "Rejected"
                                         ? "Edit and resubmit"
@@ -1312,7 +1393,7 @@ export default function PurchaseOrderBoard() {
                                     <button
                                       type="button"
                                       onClick={() => void onGenerateInvoice(order)}
-                                      className="block w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-[#051A2D] hover:bg-[#F8FAFB]"
+                                      className="block w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-[#051A2D] hover:bg-[#d4dee9]"
                                     >
                                       Generate invoice
                                     </button>
@@ -1323,7 +1404,7 @@ export default function PurchaseOrderBoard() {
                                       setMenuOpenId(null);
                                       downloadOrderPdf(order);
                                     }}
-                                    className="block w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-[#0B1220] hover:bg-[#F8FAFB]"
+                                    className="block w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-[#0B1220] hover:bg-[#d4dee9]"
                                   >
                                     Download PDF
                                   </button>
@@ -1337,9 +1418,9 @@ export default function PurchaseOrderBoard() {
                               dir="ltr"
                               className="text-sm font-semibold tabular-nums text-[#051A2D]"
                             >
-                              {formatMoney(Number(order.totalAmount))}
+                              {money(Number(order.totalAmount), order.currency)}
                             </span>
-                            <span className="text-[11px] font-medium text-[#8B95A5]">
+                            <span className="text-[11px] font-semibold text-[#5B6577]">
                               {formatOrderDate(order.orderDate)}
                             </span>
                           </div>
@@ -1349,7 +1430,7 @@ export default function PurchaseOrderBoard() {
                               className={`mt-2.5 line-clamp-2 rounded-xl px-2 py-1.5 text-[11px] font-medium ${
                                 order.status === "Rejected"
                                   ? "bg-red-50 text-red-700"
-                                  : "bg-[#F8FAFB] text-[#8B95A5]"
+                                  : "bg-[#e8eef4] text-[#5B6577]"
                               }`}
                               title={order.rejectionReason}
                             >
@@ -1395,14 +1476,14 @@ export default function PurchaseOrderBoard() {
                                     setRejectReason("");
                                     setRejectError(null);
                                   }}
-                                  className="shrink-0 rounded-full border border-red-200 bg-white px-2 py-0.5 text-[10px] font-bold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                                  className="shrink-0 rounded-full border border-red-200 bg-[#e4ebf2] px-2 py-0.5 text-[10px] font-bold text-red-700 hover:bg-red-50 disabled:opacity-50"
                                 >
                                   Reject
                                 </button>
                               </>
                             ) : null}
                             {order.orderItems?.length ? (
-                              <span className="ml-auto shrink-0 text-[11px] font-medium text-[#8B95A5]">
+                              <span className="ml-auto shrink-0 text-[11px] font-semibold text-[#5B6577]">
                                 {order.orderItems.length} line
                                 {order.orderItems.length === 1 ? "" : "s"}
                               </span>
@@ -1418,10 +1499,10 @@ export default function PurchaseOrderBoard() {
           })}
         </div>
       ) : (
-        <div className="overflow-hidden rounded-[24px] border border-black/[0.04] bg-white">
+        <div className="overflow-hidden rounded-[24px] border border-black/[0.04] bg-[#e4ebf2]">
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-sm">
-              <thead className="bg-[#F8FAFB] text-xs font-semibold tracking-wide text-[#8B95A5]">
+              <thead className="bg-[#e8eef4] text-xs font-semibold tracking-wide text-[#5B6577]">
                 <tr>
                   <th className="px-5 py-3.5">Order number</th>
                   <th className="px-5 py-3.5">Buyer</th>
@@ -1437,7 +1518,7 @@ export default function PurchaseOrderBoard() {
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-5 py-12 text-center text-[#8B95A5]">
+                    <td colSpan={9} className="px-5 py-12 text-center text-[#5B6577]">
                       No orders found.
                     </td>
                   </tr>
@@ -1447,7 +1528,7 @@ export default function PurchaseOrderBoard() {
                     return (
                       <tr
                         key={order.id}
-                        className="border-t border-transparent transition hover:bg-[#F8FAFB]"
+                        className="border-t border-transparent transition hover:bg-[#d4dee9]"
                       >
                         <td className="px-5 py-3.5 font-semibold text-[#0B1220]">
                           {order.orderNumber}
@@ -1462,10 +1543,10 @@ export default function PurchaseOrderBoard() {
                           {formatOrderDate(order.orderDate)}
                         </td>
                         <td className="px-5 py-3.5 text-right font-semibold tabular-nums text-[#0B1220]">
-                          {formatMoney(Number(order.totalAmount))}
+                          {money(Number(order.totalAmount), order.currency)}
                         </td>
                         <td className="px-5 py-3.5 text-right font-medium tabular-nums text-[#4B5563]">
-                          {formatMoney(orderDiscount(order))}
+                          {money(orderDiscount(order), order.currency)}
                         </td>
                         <td className="px-5 py-3.5">
                           <span
@@ -1495,11 +1576,11 @@ export default function PurchaseOrderBoard() {
                               ···
                             </button>
                             {menuOpenId === order.id ? (
-                              <div className="absolute right-5 top-12 z-20 min-w-[200px] rounded-2xl border border-black/[0.06] bg-white p-1.5 shadow-lg ring-1 ring-black/5">
+                              <div className="absolute right-5 top-12 z-20 min-w-[200px] rounded-2xl border border-black/[0.06] bg-[#e4ebf2] p-1.5 shadow-lg ring-1 ring-black/5">
                                 <button
                                   type="button"
                                   onClick={() => openDetails(order)}
-                                  className="block w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-[#0B1220] hover:bg-[#F8FAFB]"
+                                  className="block w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-[#0B1220] hover:bg-[#d4dee9]"
                                 >
                                   View / Edit details
                                 </button>
@@ -1507,7 +1588,7 @@ export default function PurchaseOrderBoard() {
                                   <button
                                     type="button"
                                     onClick={() => openEditDraft(order)}
-                                    className="block w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-[#0B1220] hover:bg-[#F8FAFB]"
+                                    className="block w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-[#0B1220] hover:bg-[#d4dee9]"
                                   >
                                     {order.status === "Rejected"
                                       ? "Edit and resubmit"
@@ -1520,7 +1601,7 @@ export default function PurchaseOrderBoard() {
                                     setMenuOpenId(null);
                                     downloadOrderPdf(order);
                                   }}
-                                  className="block w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-[#0B1220] hover:bg-[#F8FAFB]"
+                                  className="block w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-[#0B1220] hover:bg-[#d4dee9]"
                                 >
                                   Download PDF
                                 </button>
@@ -1528,7 +1609,7 @@ export default function PurchaseOrderBoard() {
                                   <button
                                     type="button"
                                     onClick={() => void onGenerateInvoice(order)}
-                                    className="block w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-[#051A2D] hover:bg-[#F8FAFB]"
+                                    className="block w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-[#051A2D] hover:bg-[#d4dee9]"
                                   >
                                     Generate invoice
                                   </button>
@@ -1547,15 +1628,16 @@ export default function PurchaseOrderBoard() {
         </div>
       )}
 
-      {modalOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <button
-            type="button"
-            aria-label="Close dialog"
-            className="absolute inset-0 bg-[#051A2D]/55"
-            onClick={closeModal}
-          />
-          <div className="relative z-10 max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-[28px] bg-white p-6 shadow-2xl sm:p-7">
+      {modalOpen
+        ? createPortal(
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+              <button
+                type="button"
+                aria-label="Close dialog"
+                className="absolute inset-0"
+                onClick={closeModal}
+              />
+              <div className="relative z-10 my-auto max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-[28px] bg-[#e4ebf2] p-6 shadow-2xl sm:p-7">
             <div className="mb-5 flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-xl font-bold text-[#0B1220]">
@@ -1565,18 +1647,18 @@ export default function PurchaseOrderBoard() {
                       ? `Edit draft ${orderKindLabel(direction).toLowerCase()}`
                       : `Add ${orderKindLabel(direction).toLowerCase()}`}
                 </h2>
-                <p className="mt-1 text-sm font-medium text-[#8B95A5]">
+                <p className="mt-1 text-sm font-semibold text-[#5B6577]">
                   {editingDraft?.status === "Rejected"
                     ? "Change at least one field, then save to resubmit for approval."
                     : direction === "Purchase"
-                      ? "Your organization is the buyer. Pick a vendor, then add its products."
-                      : "Your organization is the seller. Pick a client, then add products."}
+                      ? "Your organization is the buyer. Pick a vendor, then add that vendor's products."
+                      : "Your organization is the seller. Pick a client, then add your products."}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={closeModal}
-                className="rounded-full px-3 py-1 text-sm font-bold text-[#8B95A5] hover:bg-[#F3F5F7]"
+                className="rounded-full px-3 py-1 text-sm font-bold text-[#5B6577] hover:bg-[#d4dee9]"
               >
                 Close
               </button>
@@ -1597,7 +1679,7 @@ export default function PurchaseOrderBoard() {
                     className={fieldClass}
                   />
                 </Field>
-                <div className="sm:col-span-2 flex rounded-full bg-[#F3F5F7] p-1">
+                <div className="sm:col-span-2 flex rounded-full bg-[#d4dee9] p-1">
                   {(
                     [
                       ["Purchase", "You buy"],
@@ -1628,30 +1710,25 @@ export default function PurchaseOrderBoard() {
                 </Field>
                 <div>
                   <Field label={direction === "Purchase" ? "Vendor *" : "Client *"}>
-                    <select
+                    <ScrollSelect
                       value={partnerCompanyId}
-                      onChange={(e) => {
-                        setPartnerCompanyId(e.target.value);
+                      placeholder={
+                        direction === "Purchase" ? "Select vendor" : "Select client"
+                      }
+                      options={partners.map((c) => ({ value: c.id, label: c.name }))}
+                      onChange={(next) => {
+                        setPartnerCompanyId(next);
                         if (direction === "Purchase") setLines([emptyLine()]);
                       }}
                       className={fieldClass}
-                    >
-                      <option value="">
-                        {direction === "Purchase" ? "Select vendor" : "Select client"}
-                      </option>
-                      {partners.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   </Field>
                   {selectedPartner ? (
-                    <p className="mt-1.5 text-xs font-medium text-[#8B95A5]">
+                    <p className="mt-1.5 text-xs font-semibold text-[#5B6577]">
                       {direction === "Purchase"
                         ? "You owe this vendor"
                         : "This client owes you"}{" "}
-                      {formatMoney(
+                      {money(
                         Number(
                           direction === "Purchase"
                             ? selectedPartner.payableBalance || 0
@@ -1670,17 +1747,17 @@ export default function PurchaseOrderBoard() {
                   />
                 </Field>
                 <Field label="Payment terms *">
-                  <select
+                  <ScrollSelect
                     value={paymentTerms}
-                    onChange={(e) => setPaymentTerms(e.target.value as PaymentTerms)}
+                    placeholder="Select payment terms"
+                    options={PAYMENT_TERMS.map((term) => ({
+                      value: term.value,
+                      label: term.label,
+                    }))}
+                    onChange={(next) => setPaymentTerms(next as PaymentTerms)}
                     className={fieldClass}
-                  >
-                    {PAYMENT_TERMS.map((term) => (
-                      <option key={term.value} value={term.value}>
-                        {term.label}
-                      </option>
-                    ))}
-                  </select>
+                    allowEmpty={false}
+                  />
                 </Field>
                 <Field label="Tax rate (%)">
                   <input
@@ -1704,7 +1781,7 @@ export default function PurchaseOrderBoard() {
 
               <div>
                 <div className="mb-2 flex items-center justify-between">
-                  <p className="text-xs font-bold uppercase tracking-wide text-[#8B95A5]">
+                  <p className="text-xs font-bold uppercase tracking-wide text-[#5B6577]">
                     Line items *
                   </p>
                   <button
@@ -1716,21 +1793,27 @@ export default function PurchaseOrderBoard() {
                   </button>
                 </div>
 
+                {liveSaleStockError ? (
+                  <p className="mb-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm font-semibold text-amber-900">
+                    {liveSaleStockError}
+                  </p>
+                ) : null}
+
                 {direction === "Purchase" && !partnerCompanyId ? (
-                  <p className="rounded-2xl bg-[#F8FAFB] px-3 py-3 text-sm font-medium text-[#8B95A5]">
+                  <p className="rounded-2xl bg-[#e8eef4] px-3 py-3 text-sm font-semibold text-[#5B6577]">
                     Choose a vendor first to load its products.
                   </p>
                 ) : lineProducts.length === 0 ? (
                   <p className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm font-medium text-amber-800">
                     {direction === "Purchase"
                       ? "This vendor has no active products yet. Add products for the vendor company first."
-                      : "No active products yet."}
+                      : "No active products in your catalog yet. Add products first."}
                   </p>
                 ) : (
                   <div className="overflow-hidden rounded-2xl border border-black/[0.06]">
                     <div className="overflow-x-auto">
                       <table className="min-w-full text-left text-sm">
-                        <thead className="bg-[#F8FAFB] text-xs font-semibold tracking-wide text-[#8B95A5]">
+                        <thead className="bg-[#e8eef4] text-xs font-semibold tracking-wide text-[#5B6577]">
                           <tr>
                             <th className="px-3 py-2.5">Product</th>
                             <th className="w-24 px-3 py-2.5 text-right">Qty</th>
@@ -1746,10 +1829,14 @@ export default function PurchaseOrderBoard() {
                             return (
                               <tr key={index} className="border-t border-transparent">
                                 <td className="px-3 py-2">
-                                  <select
+                                  <ScrollSelect
                                     value={line.productId}
-                                    onChange={(e) => {
-                                      const productId = e.target.value;
+                                    placeholder="Select product"
+                                    options={lineProducts.map((p) => ({
+                                      value: p.id,
+                                      label: p.name,
+                                    }))}
+                                    onChange={(productId) => {
                                       const product = lineProducts.find(
                                         (p) => p.id === productId,
                                       );
@@ -1765,14 +1852,7 @@ export default function PurchaseOrderBoard() {
                                       );
                                     }}
                                     className={fieldClass}
-                                  >
-                                    <option value="">Select product</option>
-                                    {lineProducts.map((p) => (
-                                      <option key={p.id} value={p.id}>
-                                        {p.name}
-                                      </option>
-                                    ))}
-                                  </select>
+                                  />
                                 </td>
                                 <td className="px-3 py-2">
                                   <input
@@ -1823,7 +1903,7 @@ export default function PurchaseOrderBoard() {
                                   dir="ltr"
                                   className="px-3 py-2 text-right font-semibold tabular-nums text-[#0B1220]"
                                 >
-                                  {formatMoney(amounts.total)}
+                                  {money(amounts.total)}
                                 </td>
                                 <td className="px-3 py-2 text-right">
                                   {lines.length > 1 ? (
@@ -1849,22 +1929,22 @@ export default function PurchaseOrderBoard() {
                   </div>
                 )}
 
-                <div className="mt-3 ml-auto w-full max-w-xs space-y-1.5 rounded-2xl bg-[#F8FAFB] px-4 py-3 text-sm">
+                <div className="mt-3 ml-auto w-full max-w-xs space-y-1.5 rounded-2xl bg-[#e8eef4] px-4 py-3 text-sm">
                   <div className="flex justify-between font-medium text-[#4B5563]">
                     <span>Discount</span>
-                    <span>{formatMoney(formTotals.discount)}</span>
+                    <span>{money(formTotals.discount)}</span>
                   </div>
                   <div className="flex justify-between font-medium text-[#4B5563]">
                     <span>Subtotal</span>
-                    <span>{formatMoney(formTotals.subtotal)}</span>
+                    <span>{money(formTotals.subtotal)}</span>
                   </div>
                   <div className="flex justify-between font-medium text-[#4B5563]">
                     <span>Tax ({formTotals.rate}%)</span>
-                    <span>{formatMoney(formTotals.tax)}</span>
+                    <span>{money(formTotals.tax)}</span>
                   </div>
                   <div className="flex justify-between border-t border-black/[0.08] pt-2 text-base font-bold text-[#0B1220]">
                     <span>Grand total</span>
-                    <span>{formatMoney(formTotals.grand)}</span>
+                    <span>{money(formTotals.grand)}</span>
                   </div>
                 </div>
               </div>
@@ -1880,7 +1960,7 @@ export default function PurchaseOrderBoard() {
                   type="button"
                   onClick={closeModal}
                   disabled={saving}
-                  className="rounded-full px-4 py-2.5 text-sm font-bold text-[#8B95A5] hover:bg-[#F3F5F7] disabled:opacity-50"
+                  className="rounded-full px-4 py-2.5 text-sm font-bold text-[#5B6577] hover:bg-[#d4dee9] disabled:opacity-50"
                 >
                   Cancel
                 </button>
@@ -1889,7 +1969,7 @@ export default function PurchaseOrderBoard() {
                     type="button"
                     disabled={saving}
                     onClick={() => void submitOrder("Draft")}
-                    className="rounded-full border border-black/[0.08] bg-white px-5 py-2.5 text-sm font-bold text-[#051A2D] hover:bg-[#F8FAFB] disabled:opacity-50"
+                    className="rounded-full border border-black/[0.08] bg-[#e4ebf2] px-5 py-2.5 text-sm font-bold text-[#051A2D] hover:bg-[#d4dee9] disabled:opacity-50"
                   >
                     {saving ? "Saving…" : editingDraft ? "Save draft" : "Save as Draft"}
                   </button>
@@ -1907,30 +1987,33 @@ export default function PurchaseOrderBoard() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      ) : null}
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
 
-      {detailOrder ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <button
-            type="button"
-            aria-label="Close details"
-            className="absolute inset-0 bg-[#051A2D]/55"
-            onClick={closeDetails}
-          />
-          <div className="relative z-10 max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[28px] bg-white p-6 shadow-2xl sm:p-7">
+      {detailOrder
+        ? createPortal(
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+              <button
+                type="button"
+                aria-label="Close details"
+                className="absolute inset-0"
+                onClick={closeDetails}
+              />
+              <div className="relative z-10 my-auto max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[28px] bg-[#e4ebf2] p-6 shadow-2xl sm:p-7">
             <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h2 className="text-xl font-bold text-[#0B1220]">
                   {detailOrder.orderNumber}
                 </h2>
-                <p className="mt-1 text-sm font-medium text-[#8B95A5]">
+                <p className="mt-1 text-sm font-semibold text-[#5B6577]">
                   {orderDirectionLabel(detailOrder.direction)} ·{" "}
                   {orderPartiesLine(detailOrder)} ·{" "}
                   {formatOrderDate(detailOrder.orderDate)}
                 </p>
-                <p className="mt-1 text-sm font-medium text-[#8B95A5]">
+                <p className="mt-1 text-sm font-semibold text-[#5B6577]">
                   Delivery:{" "}
                   {detailOrder.deliveryDate
                     ? formatOrderDate(detailOrder.deliveryDate)
@@ -1949,7 +2032,7 @@ export default function PurchaseOrderBoard() {
                     {paymentLabel(detailOrder.paymentStatus)}
                   </span>
                   {detailOrder.invoiceNumber ? (
-                    <span className="inline-flex rounded-full bg-[#F3F5F7] px-2.5 py-1 text-xs font-bold text-[#4B5563]">
+                    <span className="inline-flex rounded-full bg-[#d4dee9] px-2.5 py-1 text-xs font-bold text-[#4B5563]">
                       {detailOrder.invoiceNumber}
                     </span>
                   ) : null}
@@ -1959,7 +2042,7 @@ export default function PurchaseOrderBoard() {
                 <button
                   type="button"
                   onClick={() => downloadOrderPdf(detailOrder)}
-                  className="rounded-full border border-black/[0.08] px-4 py-2 text-sm font-bold text-[#051A2D] hover:bg-[#F8FAFB]"
+                  className="rounded-full border border-black/[0.08] px-4 py-2 text-sm font-bold text-[#051A2D] hover:bg-[#d4dee9]"
                 >
                   Download PDF
                 </button>
@@ -1970,7 +2053,7 @@ export default function PurchaseOrderBoard() {
                       closeDetails();
                       openEditDraft(detailOrder);
                     }}
-                    className="rounded-full border border-black/[0.08] px-4 py-2 text-sm font-bold text-[#051A2D] hover:bg-[#F8FAFB]"
+                    className="rounded-full border border-black/[0.08] px-4 py-2 text-sm font-bold text-[#051A2D] hover:bg-[#d4dee9]"
                   >
                     {detailOrder.status === "Rejected" ? "Edit and resubmit" : "Edit draft"}
                   </button>
@@ -1988,7 +2071,7 @@ export default function PurchaseOrderBoard() {
                 <button
                   type="button"
                   onClick={closeDetails}
-                  className="rounded-full px-3 py-2 text-sm font-bold text-[#8B95A5] hover:bg-[#F3F5F7]"
+                  className="rounded-full px-3 py-2 text-sm font-bold text-[#5B6577] hover:bg-[#d4dee9]"
                 >
                   Close
                 </button>
@@ -2003,20 +2086,20 @@ export default function PurchaseOrderBoard() {
             ) : null}
 
             {detailOrder.notes ? (
-              <p className="mb-4 rounded-2xl bg-[#F8FAFB] px-4 py-3 text-sm font-medium text-[#4B5563]">
+              <p className="mb-4 rounded-2xl bg-[#e8eef4] px-4 py-3 text-sm font-medium text-[#4B5563]">
                 {detailOrder.notes}
               </p>
             ) : null}
 
             {canEdit && detailActions.length === 0 && detailOrder.status === "Pending" ? (
-              <p className="mb-4 text-sm font-medium text-[#8B95A5]">
+              <p className="mb-4 text-sm font-semibold text-[#5B6577]">
                 Waiting for approval.
               </p>
             ) : null}
 
             {canEdit && detailActions.length > 0 ? (
-              <div className="mb-5 rounded-2xl border border-black/[0.04] bg-[#F8FAFB] px-3 py-3">
-                <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[#8B95A5]">
+              <div className="mb-5 rounded-2xl border border-black/[0.04] bg-[#e8eef4] px-3 py-3">
+                <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[#5B6577]">
                   Status
                 </p>
                 <div className="flex flex-wrap gap-1.5">
@@ -2037,10 +2120,10 @@ export default function PurchaseOrderBoard() {
                         onClick={() => void applyDetailStatus(status)}
                         className={
                           destructive
-                            ? "rounded-full border border-red-200 bg-white px-2.5 py-1 text-[11px] font-bold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                            ? "rounded-full border border-red-200 bg-[#e4ebf2] px-2.5 py-1 text-[11px] font-bold text-red-700 hover:bg-red-50 disabled:opacity-50"
                             : primary
                               ? "rounded-full bg-[#051A2D] px-2.5 py-1 text-[11px] font-bold text-white hover:bg-[#0a3050] disabled:opacity-50"
-                              : "rounded-full border border-black/[0.08] bg-white px-2.5 py-1 text-[11px] font-bold text-[#051A2D] hover:bg-[#F8FAFB] disabled:opacity-50"
+                              : "rounded-full border border-black/[0.08] bg-[#e4ebf2] px-2.5 py-1 text-[11px] font-bold text-[#051A2D] hover:bg-[#d4dee9] disabled:opacity-50"
                         }
                       >
                         {actionBusy ? "Saving…" : label}
@@ -2053,7 +2136,7 @@ export default function PurchaseOrderBoard() {
 
             <div className="overflow-hidden rounded-2xl border border-black/[0.04]">
               <table className="min-w-full text-left text-sm">
-                <thead className="bg-[#F8FAFB] text-xs font-semibold tracking-wide text-[#8B95A5]">
+                <thead className="bg-[#e8eef4] text-xs font-semibold tracking-wide text-[#5B6577]">
                   <tr>
                     <th className="px-4 py-3">Product</th>
                     <th className="px-4 py-3">SKU</th>
@@ -2066,7 +2149,7 @@ export default function PurchaseOrderBoard() {
                 <tbody>
                   {(detailOrder.orderItems ?? []).length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-4 py-8 text-center text-[#8B95A5]">
+                      <td colSpan={6} className="px-4 py-8 text-center text-[#5B6577]">
                         No line items.
                       </td>
                     </tr>
@@ -2086,19 +2169,22 @@ export default function PurchaseOrderBoard() {
                           dir="ltr"
                           className="px-4 py-3 text-right tabular-nums text-[#4B5563]"
                         >
-                          {formatMoney(Number(item.unitPrice))}
+                          {money(Number(item.unitPrice), detailOrder.currency)}
                         </td>
                         <td
                           dir="ltr"
                           className="px-4 py-3 text-right tabular-nums text-[#4B5563]"
                         >
-                          {formatMoney(Number(item.discountAmount || 0))}
+                          {money(
+                            Number(item.discountAmount || 0),
+                            detailOrder.currency,
+                          )}
                         </td>
                         <td
                           dir="ltr"
                           className="px-4 py-3 text-right font-semibold tabular-nums text-[#0B1220]"
                         >
-                          {formatMoney(Number(item.totalPrice))}
+                          {money(Number(item.totalPrice), detailOrder.currency)}
                         </td>
                       </tr>
                     ))
@@ -2110,20 +2196,21 @@ export default function PurchaseOrderBoard() {
             <div className="mt-4 ml-auto w-full max-w-xs space-y-1.5 text-sm">
               <div className="flex justify-between font-medium text-[#4B5563]">
                 <span>Discount</span>
-                <span>{formatMoney(orderDiscount(detailOrder))}</span>
+                <span>{money(orderDiscount(detailOrder), detailOrder.currency)}</span>
               </div>
               <div className="flex justify-between font-medium text-[#4B5563]">
                 <span>Subtotal</span>
                 <span>
-                  {formatMoney(
+                  {money(
                     Number(detailOrder.subtotalAmount ?? detailSubtotal),
+                    detailOrder.currency,
                   )}
                 </span>
               </div>
               <div className="flex justify-between font-medium text-[#4B5563]">
                 <span>Tax ({Number(detailOrder.taxRate || 0)}%)</span>
                 <span>
-                  {formatMoney(
+                  {money(
                     Number(
                       detailOrder.taxAmount ??
                         Math.round(
@@ -2132,27 +2219,30 @@ export default function PurchaseOrderBoard() {
                             100,
                         ) / 100,
                     ),
+                    detailOrder.currency,
                   )}
                 </span>
               </div>
               <div className="flex justify-between border-t border-black/[0.08] pt-2 text-base font-bold text-[#0B1220]">
                 <span>Grand total</span>
-                <span>{formatMoney(Number(detailOrder.totalAmount))}</span>
+                <span>
+                  {money(Number(detailOrder.totalAmount), detailOrder.currency)}
+                </span>
               </div>
             </div>
 
             <div className="mt-6">
               <h3 className="text-sm font-semibold text-[#0B1220]">History</h3>
               {!canSeeFinancialHistory ? (
-                <p className="mt-1 text-xs font-medium text-[#8B95A5]">
+                <p className="mt-1 text-xs font-semibold text-[#5B6577]">
                   Status and creation only. Financial change audit is limited to
                   organization admins and Finance.
                 </p>
               ) : null}
               {historyLoading ? (
-                <p className="mt-2 text-sm text-[#8B95A5]">Loading history…</p>
+                <p className="mt-2 text-sm text-[#5B6577]">Loading history…</p>
               ) : fieldHistory.length === 0 ? (
-                <p className="mt-2 text-sm text-[#8B95A5]">No history recorded yet.</p>
+                <p className="mt-2 text-sm text-[#5B6577]">No history recorded yet.</p>
               ) : (
                 <div className="mt-3 space-y-2">
                   {groupFieldHistory(fieldHistory).map((group) => {
@@ -2168,7 +2258,7 @@ export default function PurchaseOrderBoard() {
                       >
                         <p className="text-sm font-semibold text-[#0B1220]">
                           {formatOrderDateTime(group.createdAt)}
-                          <span className="font-medium text-[#8B95A5]">
+                          <span className="font-semibold text-[#5B6577]">
                             {" "}
                             · {group.actorName || "User"}
                           </span>
@@ -2190,71 +2280,77 @@ export default function PurchaseOrderBoard() {
                 </div>
               )}
             </div>
-          </div>
-        </div>
-      ) : null}
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
 
-      {rejectTarget ? (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-          <button
-            type="button"
-            aria-label="Close reject dialog"
-            className="absolute inset-0 bg-[#051A2D]/55"
-            onClick={() => {
-              if (rejectSaving) return;
-              setRejectTarget(null);
-              setRejectReason("");
-              setRejectError(null);
-            }}
-          />
-          <div className="relative z-10 w-full max-w-md rounded-[28px] bg-white p-6 shadow-2xl sm:p-7">
-            <h2 className="text-xl font-bold text-[#0B1220]">
-              Reject {orderKindLabel(rejectTarget.direction).toLowerCase()}
-            </h2>
-            <p className="mt-1 text-sm font-medium text-[#8B95A5]">
-              {rejectTarget.orderNumber} will move to Reject. It can be edited and resubmitted.
-            </p>
-            <label className="mt-5 block">
-              <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-[#8B95A5]">
-                Rejection reason
-              </span>
-              <textarea
-                value={rejectReason}
-                onChange={(e) => setRejectReason(e.target.value)}
-                rows={4}
-                maxLength={1000}
-                placeholder="Explain what needs to change."
-                className={`${fieldClass} min-h-[96px] resize-y`}
-              />
-            </label>
-            {rejectError ? (
-              <p className="mt-3 text-sm font-medium text-red-600">{rejectError}</p>
-            ) : null}
-            <div className="mt-6 flex flex-wrap justify-end gap-3">
+      {rejectTarget
+        ? createPortal(
+            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
               <button
                 type="button"
-                disabled={rejectSaving}
+                aria-label="Close reject dialog"
+                className="absolute inset-0"
                 onClick={() => {
+                  if (rejectSaving) return;
                   setRejectTarget(null);
                   setRejectReason("");
                   setRejectError(null);
                 }}
-                className="rounded-full border border-black/[0.08] px-5 py-2.5 text-sm font-bold text-[#051A2D] hover:bg-[#F8FAFB] disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={rejectSaving}
-                onClick={() => void confirmReject()}
-                className="rounded-full bg-red-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50"
-              >
-                {rejectSaving ? "Rejecting…" : "Reject order"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+              />
+              <div className="relative z-10 my-auto max-h-[90vh] w-full max-w-md overflow-y-auto rounded-[28px] bg-[#e4ebf2] p-6 shadow-2xl sm:p-7">
+                <h2 className="text-xl font-bold text-[#0B1220]">
+                  Reject {orderKindLabel(rejectTarget.direction).toLowerCase()}
+                </h2>
+                <p className="mt-1 text-sm font-semibold text-[#5B6577]">
+                  {rejectTarget.orderNumber} will move to Reject. It can be edited and
+                  resubmitted.
+                </p>
+                <label className="mt-5 block">
+                  <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-[#5B6577]">
+                    Rejection reason
+                  </span>
+                  <textarea
+                    value={rejectReason}
+                    onChange={(e) => setRejectReason(e.target.value)}
+                    rows={4}
+                    maxLength={1000}
+                    placeholder="Explain what needs to change."
+                    className={`${fieldClass} min-h-[96px] resize-y`}
+                  />
+                </label>
+                {rejectError ? (
+                  <p className="mt-3 text-sm font-medium text-red-600">{rejectError}</p>
+                ) : null}
+                <div className="mt-6 flex flex-wrap justify-end gap-3">
+                  <button
+                    type="button"
+                    disabled={rejectSaving}
+                    onClick={() => {
+                      setRejectTarget(null);
+                      setRejectReason("");
+                      setRejectError(null);
+                    }}
+                    className="rounded-full border border-black/[0.08] px-5 py-2.5 text-sm font-bold text-[#051A2D] hover:bg-[#d4dee9] disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={rejectSaving}
+                    onClick={() => void confirmReject()}
+                    className="rounded-full bg-red-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50"
+                  >
+                    {rejectSaving ? "Rejecting…" : "Reject order"}
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }
@@ -2273,12 +2369,12 @@ function StatCard({
       className={`rounded-[22px] border px-5 py-4 ${
         emphasize
           ? "border-amber-200 bg-amber-50/70"
-          : "border-black/[0.04] bg-white"
+          : "border-black/[0.04] bg-[#e4ebf2]"
       }`}
     >
       <p
         className={`text-xs font-semibold uppercase tracking-wide ${
-          emphasize ? "text-amber-700" : "text-[#8B95A5]"
+          emphasize ? "text-amber-700" : "text-[#5B6577]"
         }`}
       >
         {label}
@@ -2305,7 +2401,7 @@ function Field({
 }) {
   return (
     <label className={`block ${className}`}>
-      <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-[#8B95A5]">
+      <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-[#5B6577]">
         {label}
       </span>
       {children}

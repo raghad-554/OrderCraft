@@ -49,10 +49,10 @@ export default function OrganizationChooser({
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-[#051A2D] px-4 py-10 text-white">
-      <div className="w-full max-w-md rounded-[28px] bg-white p-6 text-[#051A2D] shadow-2xl sm:p-8">
-        <p className="text-xs font-bold uppercase tracking-wide text-[#8B95A5]">Choose organization</p>
+      <div className="w-full max-w-md rounded-[28px] bg-[#e4ebf2] p-6 text-[#051A2D] shadow-2xl sm:p-8">
+        <p className="text-xs font-bold uppercase tracking-wide text-[#5B6577]">Choose organization</p>
         <h1 className="mt-2 text-2xl font-extrabold">Hi, {fullName}</h1>
-        <p className="mt-2 text-sm font-medium text-[#8B95A5]">
+        <p className="mt-2 text-sm font-semibold text-[#5B6577]">
           This password opened more than one organization. Choose which workspace to open, then confirm that
           organization&apos;s password. Data is never shared between them.
         </p>
@@ -73,11 +73,11 @@ export default function OrganizationChooser({
                   setError(null);
                   setPending(org);
                 }}
-                className="flex w-full items-center justify-between rounded-2xl border border-black/[0.06] bg-[#F8FAFB] px-4 py-3 text-left transition hover:bg-[#F3F5F7] disabled:opacity-60"
+                className="flex w-full items-center justify-between rounded-2xl border border-black/[0.06] bg-[#e8eef4] px-4 py-3 text-left transition hover:bg-[#d4dee9] disabled:opacity-60"
               >
                 <span>
                   <span className="block text-sm font-bold">{org.name}</span>
-                  <span className="block text-xs font-medium text-[#8B95A5]">{roleLabel(org.role)}</span>
+                  <span className="block text-xs font-semibold text-[#5B6577]">{roleLabel(org.role)}</span>
                 </span>
                 <span className="text-xs font-bold text-[#051A2D]">
                   Open
@@ -90,7 +90,7 @@ export default function OrganizationChooser({
         <button
           type="button"
           onClick={onLogout}
-          className="mt-5 w-full rounded-full px-4 py-2 text-sm font-bold text-[#8B95A5] hover:bg-[#F3F5F7]"
+          className="mt-5 w-full rounded-full px-4 py-2 text-sm font-bold text-[#5B6577] hover:bg-[#d4dee9]"
         >
           Log out
         </button>

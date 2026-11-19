@@ -13,7 +13,7 @@ import type { OrganizationDepartment } from "@/lib/org-catalog";
 const MIN_QUERY = 2;
 const MAX_RESULTS = 8;
 const fieldClass =
-  "w-full rounded-2xl border border-black/[0.06] bg-[#F3F5F7] px-3.5 py-2.5 text-sm font-medium text-[#0B1220] outline-none focus:bg-white focus:ring-2 focus:ring-[#051A2D]/30";
+  "w-full rounded-2xl border border-black/[0.06] bg-[#d4dee9] px-3.5 py-2.5 text-sm font-medium text-[#0B1220] outline-none focus:bg-[#e4ebf2] focus:ring-2 focus:ring-[#051A2D]/30";
 
 export default function AssignDepartmentEmployeesDialog({
   department,
@@ -122,11 +122,11 @@ export default function AssignDepartmentEmployeesDialog({
           if (!saving) onClose();
         }}
       />
-      <div className="relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-[28px] bg-white p-6 shadow-2xl sm:p-7">
+      <div className="relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-[28px] bg-[#e4ebf2] p-6 shadow-2xl sm:p-7">
         <div className="mb-5 flex items-start justify-between gap-3">
           <div>
             <h2 className="text-xl font-bold text-[#0B1220]">Add employees</h2>
-            <p className="mt-1 text-sm font-medium text-[#8B95A5]">
+            <p className="mt-1 text-sm font-semibold text-[#5B6577]">
               Search by name, username, or email, then add people to {department.name}.
             </p>
           </div>
@@ -134,7 +134,7 @@ export default function AssignDepartmentEmployeesDialog({
             type="button"
             onClick={onClose}
             disabled={saving}
-            className="rounded-full px-3 py-1 text-sm font-bold text-[#8B95A5] hover:bg-[#F3F5F7] disabled:opacity-50"
+            className="rounded-full px-3 py-1 text-sm font-bold text-[#5B6577] hover:bg-[#d4dee9] disabled:opacity-50"
           >
             Close
           </button>
@@ -153,7 +153,7 @@ export default function AssignDepartmentEmployeesDialog({
                     type="button"
                     onClick={() => removePicked(employee.id)}
                     disabled={saving}
-                    className="text-[#8B95A5] hover:text-[#051A2D] disabled:opacity-50"
+                    className="text-[#5B6577] hover:text-[#051A2D] disabled:opacity-50"
                     aria-label={`Remove ${employee.fullName}`}
                   >
                     ×
@@ -164,7 +164,7 @@ export default function AssignDepartmentEmployeesDialog({
           ) : null}
 
           <label className="block">
-            <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-[#8B95A5]">
+            <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-[#5B6577]">
               Search
             </span>
             <input
@@ -178,11 +178,11 @@ export default function AssignDepartmentEmployeesDialog({
           </label>
 
           {search.trim().length > 0 && search.trim().length < MIN_QUERY ? (
-            <p className="text-sm font-medium text-[#8B95A5]">Type at least 2 characters.</p>
+            <p className="text-sm font-semibold text-[#5B6577]">Type at least 2 characters.</p>
           ) : loading ? (
-            <p className="text-sm font-medium text-[#8B95A5]">Searching…</p>
+            <p className="text-sm font-semibold text-[#5B6577]">Searching…</p>
           ) : debouncedSearch.length >= MIN_QUERY && results.length === 0 ? (
-            <p className="text-sm font-medium text-[#8B95A5]">No matching employees to add.</p>
+            <p className="text-sm font-semibold text-[#5B6577]">No matching employees to add.</p>
           ) : results.length > 0 ? (
             <ul className="divide-y divide-black/[0.04] rounded-[20px] border border-black/[0.04]">
               {results.map((employee) => (
@@ -191,11 +191,11 @@ export default function AssignDepartmentEmployeesDialog({
                     type="button"
                     onClick={() => pick(employee)}
                     disabled={saving}
-                    className="flex w-full items-start justify-between gap-3 px-4 py-3 text-left hover:bg-[#F8FAFB] disabled:opacity-50"
+                    className="flex w-full items-start justify-between gap-3 px-4 py-3 text-left hover:bg-[#d4dee9] disabled:opacity-50"
                   >
                     <span className="min-w-0">
                       <span className="block font-semibold text-[#0B1220]">{employee.fullName}</span>
-                      <span className="mt-0.5 block text-xs font-medium text-[#8B95A5]">
+                      <span className="mt-0.5 block text-xs font-semibold text-[#5B6577]">
                         {employee.email}
                         {employee.department ? ` · ${employee.department}` : ""}
                       </span>
@@ -218,7 +218,7 @@ export default function AssignDepartmentEmployeesDialog({
               type="button"
               onClick={onClose}
               disabled={saving}
-              className="rounded-full px-4 py-2.5 text-sm font-bold text-[#8B95A5] hover:bg-[#F3F5F7] disabled:opacity-50"
+              className="rounded-full px-4 py-2.5 text-sm font-bold text-[#5B6577] hover:bg-[#d4dee9] disabled:opacity-50"
             >
               Cancel
             </button>

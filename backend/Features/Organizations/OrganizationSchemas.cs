@@ -109,18 +109,70 @@ public class SwitchOrganizationRequestValidator : AbstractValidator<SwitchOrgani
 
 public class OrganizationSettingsResponse
 {
+    public string Name { get; set; } = string.Empty;
+    public string Slug { get; set; } = string.Empty;
+    public string? ContactEmail { get; set; }
+    public string? ContactPhone { get; set; }
+    public string? LogoUrl { get; set; }
+    public string DefaultCurrency { get; set; } = "USD";
+    public decimal DefaultTaxRate { get; set; }
+    public PaymentTerms DefaultPaymentTerms { get; set; } = PaymentTerms.Net30;
     public decimal ApprovalThreshold { get; set; }
 }
 
 public class UpdateOrganizationSettingsRequest
 {
+    public string Name { get; set; } = string.Empty;
+    public string? ContactEmail { get; set; }
+    public string? ContactPhone { get; set; }
+    public string? LogoUrl { get; set; }
+    public string DefaultCurrency { get; set; } = "USD";
+    public decimal DefaultTaxRate { get; set; }
+    public PaymentTerms DefaultPaymentTerms { get; set; } = PaymentTerms.Net30;
     public decimal ApprovalThreshold { get; set; }
 }
 
 public class UpdateOrganizationSettingsRequestValidator : AbstractValidator<UpdateOrganizationSettingsRequest>
 {
+    private static readonly HashSet<string> AllowedCurrencies = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "USD", "EUR", "GBP", "SAR", "AED", "JOD", "EGP", "KWD", "QAR", "BHD"
+    };
+
     public UpdateOrganizationSettingsRequestValidator()
     {
+        RuleFor(x => x.Name)
+            .NotEmpty()
+            .MaximumLength(200);
+
+        RuleFor(x => x.ContactEmail)
+            .EmailAddress()
+            .When(x => !string.IsNullOrWhiteSpace(x.ContactEmail))
+            .MaximumLength(256);
+
+        RuleFor(x => x.ContactPhone)
+            .MaximumLength(20);
+
+        RuleFor(x => x.LogoUrl)
+            .MaximumLength(500)
+            .Must(url =>
+                string.IsNullOrWhiteSpace(url)
+                || Uri.TryCreate(url, UriKind.Absolute, out var parsed)
+                    && (parsed.Scheme == Uri.UriSchemeHttp || parsed.Scheme == Uri.UriSchemeHttps))
+            .WithMessage("LogoUrl must be an http(s) URL.");
+
+        RuleFor(x => x.DefaultCurrency)
+            .NotEmpty()
+            .MaximumLength(3)
+            .Must(code => AllowedCurrencies.Contains(code.Trim()))
+            .WithMessage("DefaultCurrency is not supported.");
+
+        RuleFor(x => x.DefaultTaxRate)
+            .InclusiveBetween(0, 100);
+
+        RuleFor(x => x.DefaultPaymentTerms)
+            .IsInEnum();
+
         RuleFor(x => x.ApprovalThreshold)
             .GreaterThanOrEqualTo(0)
             .LessThanOrEqualTo(1_000_000_000m)

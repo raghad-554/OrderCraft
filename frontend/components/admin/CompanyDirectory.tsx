@@ -10,6 +10,7 @@ import {
 } from "react";
 import { useSearchParams } from "next/navigation";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
+import ScrollSelect from "@/components/ui/ScrollSelect";
 import { ApiError } from "@/lib/api";
 import { getSession, isAdmin } from "@/lib/auth";
 import { canEditPage } from "@/lib/permissions";
@@ -29,7 +30,7 @@ import {
 } from "@/lib/companies";
 
 const fieldClass =
-  "w-full rounded-2xl border border-black/[0.06] bg-[#F3F5F7] px-3.5 py-2.5 text-sm font-medium text-[#0B1220] outline-none focus:bg-white focus:ring-2 focus:ring-[#051A2D]/30";
+  "w-full rounded-2xl border border-black/[0.06] bg-[#d4dee9] px-3.5 py-2.5 text-sm font-medium text-[#0B1220] outline-none focus:bg-[#e4ebf2] focus:ring-2 focus:ring-[#051A2D]/30";
 
 const PAGE_SIZE = 8;
 const STATUS_OPTIONS: CompanyStatus[] = ["Active", "PendingReview", "Inactive"];
@@ -238,9 +239,9 @@ function ContactCell({ company }: { company: Company }) {
   return (
     <div>
       <p className="font-semibold text-[#0B1220]">{company.name}</p>
-      <p className="mt-0.5 text-xs font-medium text-[#8B95A5]">{company.email}</p>
+      <p className="mt-0.5 text-xs font-semibold text-[#5B6577]">{company.email}</p>
       {company.phone ? (
-        <p className="text-xs font-medium text-[#8B95A5]">{company.phone}</p>
+        <p className="text-xs font-semibold text-[#5B6577]">{company.phone}</p>
       ) : null}
     </div>
   );
@@ -442,13 +443,13 @@ export default function CompanyDirectory({
               className={`inline-flex min-w-[180px] flex-1 flex-col items-start rounded-[22px] px-7 py-4 text-left transition sm:flex-none ${
                 active
                   ? "bg-[#0B1220] text-white"
-                  : "bg-white text-[#0B1220] ring-1 ring-black/[0.06] hover:bg-[#F8FAFB]"
+                  : "bg-[#e4ebf2] text-[#0B1220] ring-1 ring-black/[0.06] hover:bg-[#d4dee9]"
               }`}
             >
               <span className="text-base font-bold">{tabConfig.title}</span>
               <span
                 className={`mt-1 text-xs font-medium ${
-                  active ? "text-white/60" : "text-[#8B95A5]"
+                  active ? "text-white/60" : "text-[#5B6577]"
                 }`}
               >
                 {tabConfig.description}
@@ -465,10 +466,10 @@ export default function CompanyDirectory({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={`Search ${config.title.toLowerCase()}…`}
-            className="w-full rounded-2xl border border-black/[0.06] bg-white px-4 py-2.5 text-sm font-medium text-[#0B1220] outline-none ring-[#051A2D]/30 placeholder:text-[#8B95A5] focus:ring-2"
+            className="w-full rounded-2xl border border-black/[0.06] bg-[#e4ebf2] px-4 py-2.5 text-sm font-medium text-[#0B1220] outline-none ring-[#051A2D]/30 placeholder:text-[#5B6577] focus:ring-2"
           />
         </label>
-        <p className="text-sm font-medium text-[#8B95A5]">
+        <p className="text-sm font-semibold text-[#5B6577]">
           {loading
             ? "Loading…"
             : `${companies.length} ${companies.length === 1 ? "company" : "companies"}${canEdit ? "" : " · view only"}`}
@@ -481,10 +482,10 @@ export default function CompanyDirectory({
         </div>
       ) : null}
 
-      <div className="overflow-hidden rounded-[24px] border border-black/[0.04] bg-white">
+      <div className="overflow-hidden rounded-[24px] border border-black/[0.04] bg-[#e4ebf2]">
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
-            <thead className="bg-[#F8FAFB] text-xs font-semibold tracking-wide text-[#8B95A5]">
+            <thead className="bg-[#e8eef4] text-xs font-semibold tracking-wide text-[#5B6577]">
               {mode === "vendors" ? (
                 <tr>
                   <th className="px-5 py-3.5">Vendor name &amp; contact</th>
@@ -512,13 +513,13 @@ export default function CompanyDirectory({
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={colCount} className="px-5 py-12 text-center text-[#8B95A5]">
+                  <td colSpan={colCount} className="px-5 py-12 text-center text-[#5B6577]">
                     Loading {config.title.toLowerCase()}…
                   </td>
                 </tr>
               ) : pageRows.length === 0 ? (
                 <tr>
-                  <td colSpan={colCount} className="px-5 py-12 text-center text-[#8B95A5]">
+                  <td colSpan={colCount} className="px-5 py-12 text-center text-[#5B6577]">
                     No {config.title.toLowerCase()} found.
                   </td>
                 </tr>
@@ -526,7 +527,7 @@ export default function CompanyDirectory({
                 pageRows.map((company) => (
                   <tr
                     key={company.id}
-                    className="border-t border-black/[0.04] transition hover:bg-[#F8FAFB]"
+                    className="border-t border-black/[0.04] transition hover:bg-[#d4dee9]"
                   >
                     <td className="px-5 py-3.5">
                       <ContactCell company={company} />
@@ -536,10 +537,10 @@ export default function CompanyDirectory({
                     </td>
                     <td className="px-5 py-3.5">
                       <p className="font-semibold text-[#0B1220]">{company.orderCount} POs</p>
-                      <p className="text-xs font-medium text-[#8B95A5]">
+                      <p className="text-xs font-semibold text-[#5B6577]">
                         {money(company.totalSpend)}
                       </p>
-                      <p className="text-xs font-medium text-[#8B95A5]">
+                      <p className="text-xs font-semibold text-[#5B6577]">
                         Owed {money(company.payableBalance)}
                       </p>
                     </td>
@@ -565,7 +566,7 @@ export default function CompanyDirectory({
                           onDelete={() => void onDelete(company)}
                         />
                       ) : (
-                        <span className="text-xs font-medium text-[#8B95A5]">View</span>
+                        <span className="text-xs font-semibold text-[#5B6577]">View</span>
                       )}
                     </td>
                   </tr>
@@ -574,7 +575,7 @@ export default function CompanyDirectory({
                 pageRows.map((company) => (
                   <tr
                     key={company.id}
-                    className="border-t border-black/[0.04] transition hover:bg-[#F8FAFB]"
+                    className="border-t border-black/[0.04] transition hover:bg-[#d4dee9]"
                   >
                     <td className="px-5 py-3.5">
                       <ContactCell company={company} />
@@ -605,7 +606,7 @@ export default function CompanyDirectory({
                           onDelete={() => void onDelete(company)}
                         />
                       ) : (
-                        <span className="text-xs font-medium text-[#8B95A5]">View</span>
+                        <span className="text-xs font-semibold text-[#5B6577]">View</span>
                       )}
                     </td>
                   </tr>
@@ -617,7 +618,7 @@ export default function CompanyDirectory({
 
         {companies.length > PAGE_SIZE ? (
           <div className="flex items-center justify-between gap-3 border-t border-black/[0.04] px-5 py-3">
-            <p className="text-xs font-medium text-[#8B95A5]">
+            <p className="text-xs font-semibold text-[#5B6577]">
               Page {currentPage} of {pageCount}
             </p>
             <div className="flex gap-2">
@@ -625,7 +626,7 @@ export default function CompanyDirectory({
                 type="button"
                 disabled={currentPage <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="rounded-full bg-[#F3F5F7] px-3 py-1.5 text-xs font-bold text-[#051A2D] disabled:opacity-40"
+                className="rounded-full bg-[#d4dee9] px-3 py-1.5 text-xs font-bold text-[#051A2D] disabled:opacity-40"
               >
                 Previous
               </button>
@@ -633,7 +634,7 @@ export default function CompanyDirectory({
                 type="button"
                 disabled={currentPage >= pageCount}
                 onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
-                className="rounded-full bg-[#F3F5F7] px-3 py-1.5 text-xs font-bold text-[#051A2D] disabled:opacity-40"
+                className="rounded-full bg-[#d4dee9] px-3 py-1.5 text-xs font-bold text-[#051A2D] disabled:opacity-40"
               >
                 Next
               </button>
@@ -650,13 +651,13 @@ export default function CompanyDirectory({
             className="absolute inset-0 bg-[#051A2D]/55"
             onClick={closeModal}
           />
-          <div className="relative z-10 max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-[28px] bg-white p-6 shadow-2xl sm:p-7">
+          <div className="relative z-10 max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-[28px] bg-[#e4ebf2] p-6 shadow-2xl sm:p-7">
             <div className="mb-5 flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-xl font-bold text-[#0B1220]">
                   {editing ? `Edit ${config.singular}` : `Add ${config.singular}`}
                 </h2>
-                <p className="mt-1 text-sm font-medium text-[#8B95A5]">
+                <p className="mt-1 text-sm font-semibold text-[#5B6577]">
                   {form.type === "Both"
                     ? "Fill client and vendor fields before saving."
                     : mode === "vendors"
@@ -667,7 +668,7 @@ export default function CompanyDirectory({
               <button
                 type="button"
                 onClick={closeModal}
-                className="rounded-full px-3 py-1 text-sm font-bold text-[#8B95A5] hover:bg-[#F3F5F7]"
+                className="rounded-full px-3 py-1 text-sm font-bold text-[#5B6577] hover:bg-[#d4dee9]"
               >
                 Close
               </button>
@@ -701,19 +702,19 @@ export default function CompanyDirectory({
                   />
                 </Field>
                 <Field label="Type">
-                  <select
+                  <ScrollSelect
                     value={form.type}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, type: e.target.value as CompanyType }))
+                    placeholder="Select type"
+                    options={config.typeOptions.map((type) => ({
+                      value: type,
+                      label: type,
+                    }))}
+                    onChange={(next) =>
+                      setForm((f) => ({ ...f, type: next as CompanyType }))
                     }
                     className={fieldClass}
-                  >
-                    {config.typeOptions.map((type) => (
-                      <option key={type} value={type}>
-                        {type}
-                      </option>
-                    ))}
-                  </select>
+                    allowEmpty={false}
+                  />
                 </Field>
                 <Field label={form.type === "Both" ? "Payment terms *" : "Payment terms"}>
                   <input
@@ -759,7 +760,7 @@ export default function CompanyDirectory({
                         className={fieldClass}
                         disabled
                       />
-                      <span className="mt-1 block text-xs font-medium text-[#8B95A5]">
+                      <span className="mt-1 block text-xs font-semibold text-[#5B6577]">
                         Calculated from this buyer&apos;s open invoices.
                       </span>
                     </Field>
@@ -800,20 +801,18 @@ export default function CompanyDirectory({
                       }
                       className="sm:col-span-2"
                     >
-                      <select
+                      <ScrollSelect
                         value={form.categoryId}
-                        onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))}
+                        placeholder={
+                          form.type === "Both" ? "Select category" : "No category"
+                        }
+                        options={categories.map((cat) => ({
+                          value: cat.id,
+                          label: cat.name,
+                        }))}
+                        onChange={(categoryId) => setForm((f) => ({ ...f, categoryId }))}
                         className={fieldClass}
-                      >
-                        <option value="">
-                          {form.type === "Both" ? "Select category" : "No category"}
-                        </option>
-                        {categories.map((cat) => (
-                          <option key={cat.id} value={cat.id}>
-                            {cat.name}
-                          </option>
-                        ))}
-                      </select>
+                      />
                     </Field>
                     <Field
                       label={form.type === "Both" ? "Total spend *" : "Total spend"}
@@ -859,22 +858,22 @@ export default function CompanyDirectory({
                       />
                     </Field>
                     <Field label="Status">
-                      <select
+                      <ScrollSelect
                         value={form.status}
-                        onChange={(e) =>
+                        placeholder="Select status"
+                        options={STATUS_OPTIONS.map((status) => ({
+                          value: status,
+                          label: statusLabel(status),
+                        }))}
+                        onChange={(next) =>
                           setForm((f) => ({
                             ...f,
-                            status: e.target.value as CompanyStatus,
+                            status: next as CompanyStatus,
                           }))
                         }
                         className={fieldClass}
-                      >
-                        {STATUS_OPTIONS.map((status) => (
-                          <option key={status} value={status}>
-                            {statusLabel(status)}
-                          </option>
-                        ))}
-                      </select>
+                        allowEmpty={false}
+                      />
                     </Field>
                   </>
                 ) : null}
@@ -891,7 +890,7 @@ export default function CompanyDirectory({
                   type="button"
                   onClick={closeModal}
                   disabled={saving}
-                  className="rounded-full px-4 py-2.5 text-sm font-bold text-[#8B95A5] hover:bg-[#F3F5F7] disabled:opacity-50"
+                  className="rounded-full px-4 py-2.5 text-sm font-bold text-[#5B6577] hover:bg-[#d4dee9] disabled:opacity-50"
                 >
                   Cancel
                 </button>
@@ -952,7 +951,7 @@ function Field({
 }) {
   return (
     <label className={`block ${className}`}>
-      <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-[#8B95A5]">
+      <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-[#5B6577]">
         {label}
       </span>
       {children}
