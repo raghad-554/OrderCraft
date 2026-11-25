@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using OrderCraft.Models;
 using OrderCraft.Schemas;
+using OrderCraft.Tenancy;
 
 namespace OrderCraft.Services;
 
@@ -107,6 +108,7 @@ public class OrderService : IOrderService
             var (discount, total) = OrderItemPricing.Price(i.Quantity, i.UnitPrice, i.DiscountAmount);
             return new OrderItem
             {
+                Id = Guid.NewGuid(),
                 ProductId = i.ProductId,
                 Quantity = i.Quantity,
                 UnitPrice = i.UnitPrice,
@@ -291,37 +293,29 @@ public class OrderService : IOrderService
 
         if (request.OrderItems is { Count: > 0 })
         {
-            var existingItems = order.OrderItems.ToList();
-            var incoming = request.OrderItems;
+            // Replace lines wholesale — index-based updates can hit missing rows and throw
+            // DbUpdateConcurrencyException (500) when the tracked set drifts from the DB.
+            var previousLines = order.OrderItems.ToList();
+            _dbContext.OrderItems.RemoveRange(previousLines);
+            order.OrderItems.Clear();
 
-            for (var i = 0; i < incoming.Count; i++)
+            foreach (var line in request.OrderItems)
             {
-                var line = incoming[i];
-                var (discount, total) = OrderItemPricing.Price(line.Quantity, line.UnitPrice, line.DiscountAmount);
-                if (i < existingItems.Count)
+                var (discount, total) = OrderItemPricing.Price(
+                    line.Quantity,
+                    line.UnitPrice,
+                    line.DiscountAmount);
+                order.OrderItems.Add(new OrderItem
                 {
-                    existingItems[i].ProductId = line.ProductId;
-                    existingItems[i].Quantity = line.Quantity;
-                    existingItems[i].UnitPrice = line.UnitPrice;
-                    existingItems[i].DiscountAmount = discount;
-                    existingItems[i].TotalPrice = total;
-                }
-                else
-                {
-                    order.OrderItems.Add(new OrderItem
-                    {
-                        OrderId = order.Id,
-                        ProductId = line.ProductId,
-                        Quantity = line.Quantity,
-                        UnitPrice = line.UnitPrice,
-                        DiscountAmount = discount,
-                        TotalPrice = total
-                    });
-                }
+                    Id = Guid.NewGuid(),
+                    OrderId = order.Id,
+                    ProductId = line.ProductId,
+                    Quantity = line.Quantity,
+                    UnitPrice = line.UnitPrice,
+                    DiscountAmount = discount,
+                    TotalPrice = total
+                });
             }
-
-            for (var i = incoming.Count; i < existingItems.Count; i++)
-                _dbContext.OrderItems.Remove(existingItems[i]);
         }
 
         var subtotal = order.OrderItems.Sum(i => i.TotalPrice);
@@ -337,7 +331,14 @@ public class OrderService : IOrderService
             PartyIds(order.BuyerCompanyId, order.SupplierCompanyId),
             cancellationToken);
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return (null, "This order changed while you were editing. Reload and try again.");
+        }
 
         await _auditService.RecordAsync(
             action: "Updated",

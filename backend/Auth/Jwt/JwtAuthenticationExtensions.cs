@@ -2,8 +2,10 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using OrderCraft.Auth.Cookies;
+using OrderCraft.Auth.Revocation;
 
-namespace OrderCraft.Auth;
+namespace OrderCraft.Auth.Jwt;
 
 public static class JwtAuthenticationExtensions
 {

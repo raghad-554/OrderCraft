@@ -8,6 +8,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import ScrollSelect from "@/components/ui/ScrollSelect";
@@ -554,8 +555,9 @@ export default function InvoiceDirectory() {
         </div>
       </div>
 
-      {paying ? (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+      {paying
+        ? createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto p-4">
           <button
             type="button"
             aria-label="Close payment dialog"
@@ -606,10 +608,13 @@ export default function InvoiceDirectory() {
             </form>
           </div>
         </div>
+      ,
+        document.body,
       ) : null}
 
-      {modalOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {modalOpen
+        ? createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto p-4">
           <button
             type="button"
             aria-label="Close dialog"
@@ -757,6 +762,8 @@ export default function InvoiceDirectory() {
             </form>
           </div>
         </div>
+      ,
+        document.body,
       ) : null}
     </div>
   );

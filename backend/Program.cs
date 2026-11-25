@@ -1,9 +1,12 @@
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
-using OrderCraft.Auth;
+using OrderCraft.Auth.Claims;
+using OrderCraft.Auth.Jwt;
+using OrderCraft.Middleware;
 using OrderCraft.Routes;
 using OrderCraft.Services;
+using OrderCraft.Tenancy;
 using Swashbuckle.AspNetCore.SwaggerGen;
 using Swashbuckle.AspNetCore.SwaggerUI;
 
@@ -85,7 +88,7 @@ builder.Services.AddScoped<TenantConnectionInterceptor>(sp =>
 
     var httpUser = sp.GetRequiredService<IHttpContextAccessor>().HttpContext?.User;
     var claim =
-        httpUser?.FindFirst(TenantMiddleware.OrgIdClaim)?.Value
+        httpUser?.FindFirst(AuthClaims.OrgId)?.Value
         ?? httpUser?.FindFirst("organizationId")?.Value
         ?? string.Empty;
 

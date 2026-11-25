@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
-using OrderCraft.Auth;
+using OrderCraft.Auth.Jwt;
+using OrderCraft.Auth.Revocation;
 using OrderCraft.Models;
 using OrderCraft.Schemas;
+using OrderCraft.Tenancy;
 
 namespace OrderCraft.Services;
 

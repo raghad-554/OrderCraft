@@ -8,6 +8,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import { useSearchParams } from "next/navigation";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import ScrollSelect from "@/components/ui/ScrollSelect";
@@ -368,10 +369,34 @@ export default function CompanyDirectory({
     setFormError(null);
   }
 
-  async function onSubmit(event: FormEvent) {
+  function patchForm(patch: Partial<FormState>) {
+    setForm((prev) => ({ ...prev, ...patch }));
+    setFormError(null);
+  }
+
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canEdit) return;
-    const validation = validateForm(form);
+
+    // Sync text fields from the DOM so browser autofill is included in React state.
+    const data = new FormData(event.currentTarget);
+    const synced: FormState = {
+      ...form,
+      name: String(data.get("name") ?? form.name),
+      email: String(data.get("email") ?? form.email),
+      phone: String(data.get("phone") ?? form.phone),
+      paymentTerm: String(data.get("paymentTerm") ?? form.paymentTerm),
+      taxNumber: String(data.get("taxNumber") ?? form.taxNumber),
+      creditLimit: String(data.get("creditLimit") ?? form.creditLimit),
+      totalSales: String(data.get("totalSales") ?? form.totalSales),
+      totalSpend: String(data.get("totalSpend") ?? form.totalSpend),
+      discountRate: String(data.get("discountRate") ?? form.discountRate),
+      performanceScore: String(data.get("performanceScore") ?? form.performanceScore),
+      address: String(data.get("address") ?? form.address),
+    };
+    setForm(synced);
+
+    const validation = validateForm(synced);
     if (validation) {
       setFormError(validation);
       return;
@@ -380,7 +405,7 @@ export default function CompanyDirectory({
     setSaving(true);
     setFormError(null);
     try {
-      const payload = toPayload(form);
+      const payload = toPayload(synced);
       if (editing) {
         await updateCompany(editing.id, payload);
       } else {
@@ -643,8 +668,9 @@ export default function CompanyDirectory({
         ) : null}
       </div>
 
-      {modalOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {modalOpen
+        ? createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto p-4">
           <button
             type="button"
             aria-label="Close dialog"
@@ -678,25 +704,28 @@ export default function CompanyDirectory({
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Name *" className="sm:col-span-2">
                   <input
+                    name="name"
                     value={form.name}
-                    onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                    onChange={(e) => patchForm({ name: e.target.value })}
                     className={fieldClass}
                     autoComplete="organization"
                   />
                 </Field>
                 <Field label="Email *">
                   <input
+                    name="email"
                     type="email"
                     value={form.email}
-                    onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                    onChange={(e) => patchForm({ email: e.target.value })}
                     className={fieldClass}
-                    autoComplete="off"
+                    autoComplete="email"
                   />
                 </Field>
                 <Field label="Phone">
                   <input
+                    name="phone"
                     value={form.phone}
-                    onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+                    onChange={(e) => patchForm({ phone: e.target.value })}
                     className={fieldClass}
                     autoComplete="tel"
                   />
@@ -709,17 +738,16 @@ export default function CompanyDirectory({
                       value: type,
                       label: type,
                     }))}
-                    onChange={(next) =>
-                      setForm((f) => ({ ...f, type: next as CompanyType }))
-                    }
+                    onChange={(next) => patchForm({ type: next as CompanyType })}
                     className={fieldClass}
                     allowEmpty={false}
                   />
                 </Field>
                 <Field label={form.type === "Both" ? "Payment terms *" : "Payment terms"}>
                   <input
+                    name="paymentTerm"
                     value={form.paymentTerm}
-                    onChange={(e) => setForm((f) => ({ ...f, paymentTerm: e.target.value }))}
+                    onChange={(e) => patchForm({ paymentTerm: e.target.value })}
                     className={fieldClass}
                     placeholder={
                       hasVendorRole(form.type) ? "Net 30 / Advance 50%" : "Net 15 / Net 30"
@@ -736,8 +764,9 @@ export default function CompanyDirectory({
                     ) : null}
                     <Field label="Tax ID / Commercial reg.">
                       <input
+                        name="taxNumber"
                         value={form.taxNumber}
-                        onChange={(e) => setForm((f) => ({ ...f, taxNumber: e.target.value }))}
+                        onChange={(e) => patchForm({ taxNumber: e.target.value })}
                         className={fieldClass}
                       />
                     </Field>
@@ -745,40 +774,42 @@ export default function CompanyDirectory({
                       label={form.type === "Both" ? "Credit limit *" : "Credit limit"}
                     >
                       <input
+                        name="creditLimit"
                         inputMode="decimal"
                         value={form.creditLimit}
-                        onChange={(e) =>
-                          setForm((f) => ({ ...f, creditLimit: e.target.value }))
-                        }
+                        onChange={(e) => patchForm({ creditLimit: e.target.value })}
                         className={fieldClass}
                         placeholder="0"
                       />
                     </Field>
-                    <Field label="Outstanding balance">
-                      <input
-                        value={form.outstandingBalance || "0"}
-                        className={fieldClass}
-                        disabled
-                      />
-                      <span className="mt-1 block text-xs font-semibold text-[#5B6577]">
-                        Calculated from this buyer&apos;s open invoices.
-                      </span>
-                    </Field>
+                    <div>
+                      <p className="mb-1.5 text-xs font-bold uppercase tracking-wide text-[#5B6577]">
+                        Outstanding balance
+                      </p>
+                      <div className={`${fieldClass} cursor-default text-[#5B6577]`}>
+                        {form.outstandingBalance || "0"}
+                      </div>
+                      <p className="mt-1 text-xs font-semibold text-[#5B6577]">
+                        Calculated from this buyer&apos;s open invoices. Not editable here.
+                      </p>
+                    </div>
                     <Field
                       label={form.type === "Both" ? "Total sales *" : "Total sales"}
                     >
                       <input
+                        name="totalSales"
                         inputMode="decimal"
                         value={form.totalSales}
-                        onChange={(e) => setForm((f) => ({ ...f, totalSales: e.target.value }))}
+                        onChange={(e) => patchForm({ totalSales: e.target.value })}
                         className={fieldClass}
                         placeholder="0"
                       />
                     </Field>
                     <Field label="Address" className="sm:col-span-2">
                       <textarea
+                        name="address"
                         value={form.address}
-                        onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
+                        onChange={(e) => patchForm({ address: e.target.value })}
                         rows={2}
                         className={`${fieldClass} resize-none`}
                       />
@@ -810,7 +841,7 @@ export default function CompanyDirectory({
                           value: cat.id,
                           label: cat.name,
                         }))}
-                        onChange={(categoryId) => setForm((f) => ({ ...f, categoryId }))}
+                        onChange={(categoryId) => patchForm({ categoryId })}
                         className={fieldClass}
                       />
                     </Field>
@@ -818,9 +849,10 @@ export default function CompanyDirectory({
                       label={form.type === "Both" ? "Total spend *" : "Total spend"}
                     >
                       <input
+                        name="totalSpend"
                         inputMode="decimal"
                         value={form.totalSpend}
-                        onChange={(e) => setForm((f) => ({ ...f, totalSpend: e.target.value }))}
+                        onChange={(e) => patchForm({ totalSpend: e.target.value })}
                         className={fieldClass}
                         placeholder="0"
                       />
@@ -831,11 +863,10 @@ export default function CompanyDirectory({
                       }
                     >
                       <input
+                        name="discountRate"
                         inputMode="decimal"
                         value={form.discountRate}
-                        onChange={(e) =>
-                          setForm((f) => ({ ...f, discountRate: e.target.value }))
-                        }
+                        onChange={(e) => patchForm({ discountRate: e.target.value })}
                         className={fieldClass}
                         placeholder="0"
                       />
@@ -848,11 +879,10 @@ export default function CompanyDirectory({
                       }
                     >
                       <input
+                        name="performanceScore"
                         inputMode="decimal"
                         value={form.performanceScore}
-                        onChange={(e) =>
-                          setForm((f) => ({ ...f, performanceScore: e.target.value }))
-                        }
+                        onChange={(e) => patchForm({ performanceScore: e.target.value })}
                         className={fieldClass}
                         placeholder="4.8"
                       />
@@ -866,10 +896,7 @@ export default function CompanyDirectory({
                           label: statusLabel(status),
                         }))}
                         onChange={(next) =>
-                          setForm((f) => ({
-                            ...f,
-                            status: next as CompanyStatus,
-                          }))
+                          patchForm({ status: next as CompanyStatus })
                         }
                         className={fieldClass}
                         allowEmpty={false}
@@ -905,6 +932,8 @@ export default function CompanyDirectory({
             </form>
           </div>
         </div>
+      ,
+        document.body,
       ) : null}
     </div>
   );

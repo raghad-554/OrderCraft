@@ -9,6 +9,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import ScrollSelect from "@/components/ui/ScrollSelect";
 import { ApiError } from "@/lib/api";
@@ -767,8 +768,9 @@ export default function EmployeeDirectory() {
         ) : null}
       </div>
 
-      {modalOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {modalOpen
+        ? createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto p-4">
           <button
             type="button"
             aria-label="Close dialog"
@@ -947,10 +949,13 @@ export default function EmployeeDirectory() {
             </form>
           </div>
         </div>
+      ,
+        document.body,
       ) : null}
 
-      {resetTarget ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center p-3 sm:items-center">
+      {resetTarget
+        ? createPortal(
+        <div className="fixed inset-0 z-[100] flex items-end justify-center overflow-y-auto p-3 sm:items-center">
           <button
             type="button"
             aria-label="Close dialog"
@@ -1017,6 +1022,8 @@ export default function EmployeeDirectory() {
             </form>
           </div>
         </div>
+      ,
+        document.body,
       ) : null}
 
       {departmentEditorOpen ? (

@@ -235,6 +235,23 @@ export default function OrganizationSettings() {
       <AdminPageHeader
         title="Settings"
         description="Organization profile, commercial defaults, and approval rules."
+        action={
+          canEdit ? (
+            <div className="flex flex-wrap items-center gap-3">
+              {saved ? (
+                <p className="text-sm font-medium text-emerald-700">Changes saved.</p>
+              ) : null}
+              <button
+                type="submit"
+                form="organization-settings-form"
+                disabled={loading || saving}
+                className="shrink-0 rounded-full bg-[#051A2D] px-5 py-2.5 text-sm font-bold text-white hover:bg-[#0a3050] disabled:opacity-50"
+              >
+                {saving ? "Saving…" : "Save changes"}
+              </button>
+            </div>
+          ) : null
+        }
       />
 
       <form
@@ -319,9 +336,6 @@ export default function OrganizationSettings() {
                 </div>
 
                 <div className="mt-6 flex flex-wrap items-center justify-end gap-2 border-t border-black/[0.04] pt-5">
-                  {saved ? (
-                    <p className="mr-auto text-sm font-medium text-emerald-700">Changes saved.</p>
-                  ) : null}
                   <button
                     type="button"
                     disabled={saving}
@@ -329,13 +343,6 @@ export default function OrganizationSettings() {
                     className="rounded-full px-4 py-2.5 text-sm font-bold text-[#5B6577] hover:bg-[#d4dee9] disabled:opacity-50"
                   >
                     Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={loading || saving}
-                    className="rounded-full bg-[#051A2D] px-5 py-2.5 text-sm font-bold text-white hover:bg-[#0a3050] disabled:opacity-50"
-                  >
-                    {saving ? "Saving…" : "Save changes"}
                   </button>
                 </div>
               </>
@@ -414,24 +421,11 @@ export default function OrganizationSettings() {
         </section>
 
         <section className="rounded-[24px] border border-black/[0.04] bg-[#e4ebf2] p-6">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h2 className="text-base font-bold text-[#0B1220]">Approval rules</h2>
-              <p className="mt-1 text-sm font-semibold text-[#5B6577]">
-                Orders above this total, after discount and tax, can be approved only by an
-                organization admin. 0 keeps the normal rule for every order.
-              </p>
-            </div>
-            {canEdit && !editingProfile ? (
-              <button
-                type="submit"
-                disabled={loading || saving}
-                className="shrink-0 rounded-full bg-[#051A2D] px-5 py-2.5 text-sm font-bold text-white hover:bg-[#0a3050] disabled:opacity-50"
-              >
-                {saving ? "Saving…" : "Save changes"}
-              </button>
-            ) : null}
-          </div>
+          <h2 className="text-base font-bold text-[#0B1220]">Approval rules</h2>
+          <p className="mt-1 text-sm font-semibold text-[#5B6577]">
+            Orders above this total, after discount and tax, can be approved only by an
+            organization admin. 0 keeps the normal rule for every order.
+          </p>
           <label className="mt-5 block max-w-xs">
             <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-[#5B6577]">
               Approval threshold
@@ -445,9 +439,6 @@ export default function OrganizationSettings() {
               placeholder="0"
             />
           </label>
-          {saved && !editingProfile ? (
-            <p className="mt-3 text-sm font-medium text-emerald-700">Changes saved.</p>
-          ) : null}
         </section>
 
         {!admin ? (

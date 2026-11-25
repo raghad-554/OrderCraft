@@ -8,6 +8,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import ScrollSelect from "@/components/ui/ScrollSelect";
 import { ApiError } from "@/lib/api";
@@ -347,135 +348,144 @@ export default function ProductDirectory() {
         </div>
       </div>
 
-      {modalOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <button
-            type="button"
-            aria-label="Close dialog"
-            className="absolute inset-0 bg-[#051A2D]/55"
-            onClick={closeModal}
-          />
-          <div className="relative z-10 max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-[28px] bg-[#e4ebf2] p-6 shadow-2xl sm:p-7">
-            <div className="mb-5 flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-xl font-bold text-[#0B1220]">
-                  {editing ? "Edit product" : "Add product"}
-                </h2>
-                <p className="mt-1 text-sm font-semibold text-[#5B6577]">
-                  Products are linked to a vendor and available in Add PO line items.
-                </p>
-              </div>
+      {modalOpen
+        ? createPortal(
+            <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto p-4">
               <button
                 type="button"
+                aria-label="Close dialog"
+                className="absolute inset-0 bg-[#051A2D]/55"
                 onClick={closeModal}
-                className="rounded-full px-3 py-1 text-sm font-bold text-[#5B6577] hover:bg-[#d4dee9]"
-              >
-                Close
-              </button>
-            </div>
-
-            <form noValidate onSubmit={(e) => void onSubmit(e)} className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Name *" className="sm:col-span-2">
-                  <input
-                    value={form.name}
-                    onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                    className={fieldClass}
-                    disabled={!canEdit}
-                  />
-                </Field>
-                <Field label="SKU *">
-                  <input
-                    value={form.sku}
-                    onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value }))}
-                    className={fieldClass}
-                    disabled={!canEdit}
-                  />
-                </Field>
-                <Field label="Category">
-                  <ScrollSelect
-                    value={form.categoryId}
-                    placeholder="No category"
-                    options={categories.map((c) => ({ value: c.id, label: c.name }))}
-                    onChange={(categoryId) => setForm((f) => ({ ...f, categoryId }))}
-                    className={fieldClass}
-                    disabled={!canEdit}
-                  />
-                </Field>
-                <Field label="Unit price *">
-                  <input
-                    inputMode="decimal"
-                    value={form.unitPrice}
-                    onChange={(e) => setForm((f) => ({ ...f, unitPrice: e.target.value }))}
-                    className={fieldClass}
-                    disabled={!canEdit}
-                    placeholder="0.00"
-                  />
-                </Field>
-                <Field label="Stock quantity *">
-                  <input
-                    inputMode="numeric"
-                    value={form.stockQuantity}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, stockQuantity: e.target.value }))
-                    }
-                    className={fieldClass}
-                    disabled={!canEdit}
-                  />
-                </Field>
-                <Field label="Vendor *" className="sm:col-span-2">
-                  <ScrollSelect
-                    value={form.vendorId}
-                    placeholder="Select vendor"
-                    options={vendors.map((v) => ({ value: v.id, label: v.name }))}
-                    onChange={(vendorId) => setForm((f) => ({ ...f, vendorId }))}
-                    className={fieldClass}
-                    disabled={!canEdit}
-                  />
-                </Field>
-                <Field label="Description" className="sm:col-span-2">
-                  <textarea
-                    value={form.description}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, description: e.target.value }))
-                    }
-                    rows={3}
-                    className={`${fieldClass} resize-none`}
-                    disabled={!canEdit}
-                    placeholder="Optional"
-                  />
-                </Field>
-              </div>
-
-              {formError ? (
-                <p className="rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
-                  {formError}
-                </p>
-              ) : null}
-
-              <div className="flex justify-end gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  disabled={saving}
-                  className="rounded-full px-4 py-2.5 text-sm font-bold text-[#5B6577] hover:bg-[#d4dee9] disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                {canEdit ? (
+              />
+              <div className="relative z-10 my-auto max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-[28px] bg-[#e4ebf2] p-6 shadow-2xl sm:p-7">
+                <div className="mb-5 flex items-start justify-between gap-3">
+                  <div>
+                    <h2 className="text-xl font-bold text-[#0B1220]">
+                      {editing ? "Edit product" : "Add product"}
+                    </h2>
+                    <p className="mt-1 text-sm font-semibold text-[#5B6577]">
+                      Products are linked to a vendor and available in Add PO line items.
+                    </p>
+                  </div>
                   <button
-                    type="submit"
-                    disabled={saving}
-                    className="rounded-full bg-[#051A2D] px-5 py-2.5 text-sm font-bold text-white hover:bg-[#0a3050] disabled:opacity-50"
+                    type="button"
+                    onClick={closeModal}
+                    className="rounded-full px-3 py-1 text-sm font-bold text-[#5B6577] hover:bg-[#d4dee9]"
                   >
-                    {saving ? "Saving…" : editing ? "Save changes" : "Create product"}
+                    Close
                   </button>
-                ) : null}
+                </div>
+
+                <form noValidate onSubmit={(e) => void onSubmit(e)} className="space-y-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <Field label="Name *" className="sm:col-span-2">
+                      <input
+                        value={form.name}
+                        onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                        className={fieldClass}
+                        disabled={!canEdit}
+                      />
+                    </Field>
+                    <Field label="SKU *">
+                      <input
+                        value={form.sku}
+                        onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value }))}
+                        className={fieldClass}
+                        disabled={!canEdit}
+                      />
+                    </Field>
+                    <Field label="Category">
+                      <ScrollSelect
+                        value={form.categoryId}
+                        placeholder="No category"
+                        options={categories.map((c) => ({ value: c.id, label: c.name }))}
+                        onChange={(categoryId) => setForm((f) => ({ ...f, categoryId }))}
+                        className={fieldClass}
+                        disabled={!canEdit}
+                      />
+                    </Field>
+                    <Field label="Unit price *">
+                      <input
+                        inputMode="decimal"
+                        value={form.unitPrice}
+                        onChange={(e) =>
+                          setForm((f) => ({ ...f, unitPrice: e.target.value }))
+                        }
+                        className={fieldClass}
+                        disabled={!canEdit}
+                        placeholder="0.00"
+                      />
+                    </Field>
+                    <Field label="Stock quantity *">
+                      <input
+                        inputMode="numeric"
+                        value={form.stockQuantity}
+                        onChange={(e) =>
+                          setForm((f) => ({ ...f, stockQuantity: e.target.value }))
+                        }
+                        className={fieldClass}
+                        disabled={!canEdit}
+                      />
+                    </Field>
+                    <Field label="Vendor *" className="sm:col-span-2">
+                      <ScrollSelect
+                        value={form.vendorId}
+                        placeholder="Select vendor"
+                        options={vendors.map((v) => ({ value: v.id, label: v.name }))}
+                        onChange={(vendorId) => setForm((f) => ({ ...f, vendorId }))}
+                        className={fieldClass}
+                        disabled={!canEdit}
+                      />
+                    </Field>
+                    <Field label="Description" className="sm:col-span-2">
+                      <textarea
+                        value={form.description}
+                        onChange={(e) =>
+                          setForm((f) => ({ ...f, description: e.target.value }))
+                        }
+                        rows={3}
+                        className={`${fieldClass} resize-none`}
+                        disabled={!canEdit}
+                        placeholder="Optional"
+                      />
+                    </Field>
+                  </div>
+
+                  {formError ? (
+                    <p className="rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
+                      {formError}
+                    </p>
+                  ) : null}
+
+                  <div className="flex justify-end gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={closeModal}
+                      disabled={saving}
+                      className="rounded-full px-4 py-2.5 text-sm font-bold text-[#5B6577] hover:bg-[#d4dee9] disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    {canEdit ? (
+                      <button
+                        type="submit"
+                        disabled={saving}
+                        className="rounded-full bg-[#051A2D] px-5 py-2.5 text-sm font-bold text-white hover:bg-[#0a3050] disabled:opacity-50"
+                      >
+                        {saving
+                          ? "Saving…"
+                          : editing
+                            ? "Save changes"
+                            : "Create product"}
+                      </button>
+                    ) : null}
+                  </div>
+                </form>
               </div>
-            </form>
-          </div>
-        </div>
-      ) : null}
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }

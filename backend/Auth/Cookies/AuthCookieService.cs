@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Options;
+using OrderCraft.Auth.Jwt;
 
-namespace OrderCraft.Auth;
+namespace OrderCraft.Auth.Cookies;
 
 public interface IAuthCookieService
 {
@@ -55,6 +56,7 @@ public sealed class AuthCookieService : IAuthCookieService
             IsEssential = true
         };
 
+        // Remember me: cookie survives browser restart for the same window as the JWT (~ExpireMinutes).
         if (remember)
             options.MaxAge = TimeSpan.FromMinutes(Math.Max(1, _jwt.ExpireMinutes));
 

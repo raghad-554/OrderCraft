@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc.Filters;
 using OrderCraft.Models;
 using OrderCraft.Services;
 
-namespace OrderCraft.Auth;
+namespace OrderCraft.Tenancy;
 
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method)]
 public sealed class RequirePageAttribute : Attribute, IAsyncActionFilter

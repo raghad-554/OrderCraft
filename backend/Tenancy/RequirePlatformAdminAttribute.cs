@@ -1,8 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
-using OrderCraft.Services;
 
-namespace OrderCraft.Auth;
+namespace OrderCraft.Tenancy;
 
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method)]
 public sealed class RequirePlatformAdminAttribute : Attribute, IAsyncActionFilter

@@ -3,9 +3,10 @@ using System.Security.Claims;
 using System.Text;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using OrderCraft.Auth.Claims;
 using OrderCraft.Models;
 
-namespace OrderCraft.Auth;
+namespace OrderCraft.Auth.Jwt;
 
 public class JwtTokenService : IJwtTokenService
 {
@@ -16,9 +17,11 @@ public class JwtTokenService : IJwtTokenService
         _jwtSettings = jwtSettings.Value;
     }
 
-    public (string Token, DateTime ExpiresAt) CreateToken(User user, OrganizationMembership? membership = null)
+    public (string Token, DateTime ExpiresAt) CreateToken(
+        User user,
+        OrganizationMembership? membership = null)
     {
-        var expiresAt = DateTime.UtcNow.AddMinutes(_jwtSettings.ExpireMinutes);
+        var expiresAt = DateTime.UtcNow.AddMinutes(Math.Max(1, _jwtSettings.ExpireMinutes));
 
         var role = membership?.Role ?? user.Role;
         var claims = new List<Claim>
@@ -32,13 +35,13 @@ public class JwtTokenService : IJwtTokenService
 
         if (user.IsPlatformAdmin)
         {
-            claims.Add(new Claim(TenantMiddleware.PlatformClaim, "true"));
+            claims.Add(new Claim(AuthClaims.Platform, "true"));
         }
         else if (membership is not null)
         {
-            claims.Add(new Claim(TenantMiddleware.OrgIdClaim, membership.OrganizationId.ToString()));
-            claims.Add(new Claim(TenantMiddleware.OrgRoleClaim, membership.Role.ToString()));
-            claims.Add(new Claim(TenantMiddleware.MembershipIdClaim, membership.Id.ToString()));
+            claims.Add(new Claim(AuthClaims.OrgId, membership.OrganizationId.ToString()));
+            claims.Add(new Claim(AuthClaims.OrgRole, membership.Role.ToString()));
+            claims.Add(new Claim(AuthClaims.MembershipId, membership.Id.ToString()));
         }
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.Key));

@@ -5,8 +5,9 @@ using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using OrderCraft.Models;
 using OrderCraft.Services;
+using OrderCraft.Tenancy;
 
-namespace OrderCraft.Auth;
+namespace OrderCraft.Middleware;
 
 /// <summary>
 /// Replays stored responses for mutating POSTs that send Idempotency-Key.

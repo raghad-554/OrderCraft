@@ -1630,7 +1630,7 @@ export default function PurchaseOrderBoard() {
 
       {modalOpen
         ? createPortal(
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/50 p-4">
               <button
                 type="button"
                 aria-label="Close dialog"
@@ -1995,7 +1995,7 @@ export default function PurchaseOrderBoard() {
 
       {detailOrder
         ? createPortal(
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/50 p-4">
               <button
                 type="button"
                 aria-label="Close details"
@@ -2288,7 +2288,7 @@ export default function PurchaseOrderBoard() {
 
       {rejectTarget
         ? createPortal(
-            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+            <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/50 p-4">
               <button
                 type="button"
                 aria-label="Close reject dialog"

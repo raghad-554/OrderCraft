@@ -1,18 +1,14 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
+using OrderCraft.Auth.Claims;
 using OrderCraft.Models;
 using OrderCraft.Services;
 
-namespace OrderCraft.Auth;
+namespace OrderCraft.Tenancy;
 
 public class TenantMiddleware
 {
-    public const string OrgIdClaim = "orgId";
-    public const string OrgRoleClaim = "org_role";
-    public const string MembershipIdClaim = "membershipId";
-    public const string PlatformClaim = "platform";
-
     private readonly RequestDelegate _next;
 
     public TenantMiddleware(RequestDelegate next)
@@ -38,7 +34,7 @@ public class TenantMiddleware
             if (!allowAnonymous)
             {
                 var isPlatform = string.Equals(
-                    context.User.FindFirstValue(PlatformClaim),
+                    context.User.FindFirstValue(AuthClaims.Platform),
                     "true",
                     StringComparison.OrdinalIgnoreCase);
 
@@ -58,7 +54,7 @@ public class TenantMiddleware
                 else
                 {
                     var orgId = ReadGuid(
-                        context.User.FindFirstValue(OrgIdClaim)
+                        context.User.FindFirstValue(AuthClaims.OrgId)
                         ?? context.User.FindFirstValue("organizationId"));
 
                     if (orgId.HasValue && userId.HasValue)

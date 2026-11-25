@@ -26,6 +26,15 @@ const USER_KEY = "ordercraft_user";
 const REMEMBER_KEY = "ordercraft_remember";
 const LEGACY_TOKEN_KEYS = ["ordercraft_token"] as const;
 
+/** True when the user logged in with Remember me (persists across browser restarts). */
+export function getRememberPreference(): boolean {
+  if (typeof window === "undefined") return false;
+  return (
+    localStorage.getItem(REMEMBER_KEY) === "1" ||
+    sessionStorage.getItem(REMEMBER_KEY) === "1"
+  );
+}
+
 /** Remove any JWT leftovers from browser storage (HttpOnly cookie is the auth source). */
 export function purgeAuthTokensFromStorage() {
   if (typeof window === "undefined") return;
@@ -298,9 +307,7 @@ export function applyOrganizationSession(
   remember?: boolean,
 ) {
   const current = getSession();
-  const useRemember =
-    remember ??
-    (typeof window !== "undefined" && localStorage.getItem(REMEMBER_KEY) === "1");
+  const useRemember = remember ?? getRememberPreference();
   const orgs = data.organizations?.length
     ? data.organizations
     : current?.organizations?.length

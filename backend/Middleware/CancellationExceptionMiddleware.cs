@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace OrderCraft.Auth;
+namespace OrderCraft.Middleware;
 
 /// <summary>
 /// Maps client-aborted requests to a stable non-500 response instead of an unhandled exception.

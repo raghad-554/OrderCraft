@@ -3,8 +3,9 @@ using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
 using OrderCraft.Models;
 using OrderCraft.Services;
+using OrderCraft.Tenancy;
 
-namespace OrderCraft.Auth;
+namespace OrderCraft.Auth.Revocation;
 
 public sealed class TokenRevocationService : ITokenRevocationService
 {

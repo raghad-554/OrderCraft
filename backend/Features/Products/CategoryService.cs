@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using OrderCraft.Models;
 using OrderCraft.Schemas;
+using OrderCraft.Tenancy;
 
 namespace OrderCraft.Services;
 

@@ -1,6 +1,6 @@
 using OrderCraft.Models;
 
-namespace OrderCraft.Services;
+namespace OrderCraft.Tenancy;
 
 public interface ITenantContext
 {

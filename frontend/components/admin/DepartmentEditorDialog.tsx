@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { ApiError } from "@/lib/api";
 import {
   createOrganizationDepartment,
@@ -91,8 +92,8 @@ export default function DepartmentEditorDialog({
     }
   }
 
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto p-4">
       <button
         type="button"
         aria-label="Close department dialog"
@@ -200,6 +201,7 @@ export default function DepartmentEditorDialog({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using OrderCraft.Models;
 using OrderCraft.Schemas;
+using OrderCraft.Tenancy;
 
 namespace OrderCraft.Services;
 

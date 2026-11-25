@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using OrderCraft.Auth;
+using OrderCraft.Tenancy;
 using OrderCraft.Models;
 using OrderCraft.Schemas;
 using OrderCraft.Services;

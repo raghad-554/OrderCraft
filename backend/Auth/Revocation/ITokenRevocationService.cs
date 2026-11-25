@@ -1,4 +1,4 @@
-namespace OrderCraft.Auth;
+namespace OrderCraft.Auth.Revocation;
 
 public interface ITokenRevocationService
 {

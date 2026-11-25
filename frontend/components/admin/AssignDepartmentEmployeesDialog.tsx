@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { ApiError } from "@/lib/api";
 import {
   employeeUpdatePayload,
@@ -112,8 +113,8 @@ export default function AssignDepartmentEmployeesDialog({
     }
   }
 
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto p-4">
       <button
         type="button"
         aria-label="Close add employees dialog"
@@ -236,6 +237,7 @@ export default function AssignDepartmentEmployeesDialog({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

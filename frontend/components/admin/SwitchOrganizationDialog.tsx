@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { createPortal } from "react-dom";
 
 const fieldClass =
   "w-full rounded-2xl border border-black/[0.06] bg-[#d4dee9] px-3.5 py-2.5 text-sm font-medium text-[#0B1220] outline-none focus:bg-[#e4ebf2] focus:ring-2 focus:ring-[#051A2D]/30";
@@ -26,8 +27,8 @@ export default function SwitchOrganizationDialog({
     onConfirm(password);
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center p-3 sm:items-center">
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-end justify-center overflow-y-auto p-3 sm:items-center">
       <button
         type="button"
         aria-label="Close dialog"
@@ -83,6 +84,7 @@ export default function SwitchOrganizationDialog({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

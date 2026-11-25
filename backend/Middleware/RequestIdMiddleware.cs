@@ -1,4 +1,6 @@
-namespace OrderCraft.Auth;
+using OrderCraft;
+
+namespace OrderCraft.Middleware;
 
 public sealed class RequestIdMiddleware
 {

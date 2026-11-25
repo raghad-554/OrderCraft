@@ -83,9 +83,17 @@ export function listMyOrganizations() {
 }
 
 export function switchOrganization(id: string, password: string) {
+  // Align with login Remember me (same key as lib/auth REMEMBER_KEY; avoid circular import).
+  const rememberMe =
+    typeof window !== "undefined" &&
+    (localStorage.getItem("ordercraft_remember") === "1" ||
+      sessionStorage.getItem("ordercraft_remember") === "1");
   return apiFetch<SwitchOrganizationResult>(`/api/Organizations/${id}/switch`, {
     method: "POST",
-    body: JSON.stringify({ password }),
+    body: JSON.stringify({
+      password,
+      rememberMe,
+    }),
   });
 }
 

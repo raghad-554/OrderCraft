@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import { ApiError } from "@/lib/api";
 import { getSession, isAdmin } from "@/lib/auth";
@@ -300,8 +301,9 @@ export default function RolesPermissionsPage() {
         </div>
       </div>
 
-      {selected ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {selected
+        ? createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto p-4">
           <button
             type="button"
             aria-label="Close dialog"
@@ -433,6 +435,8 @@ export default function RolesPermissionsPage() {
             </div>
           </div>
         </div>
+      ,
+        document.body,
       ) : null}
     </div>
   );

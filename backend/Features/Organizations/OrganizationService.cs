@@ -1,9 +1,10 @@
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
-using OrderCraft.Auth;
+using OrderCraft.Auth.Jwt;
 using OrderCraft.Models;
 using OrderCraft.Schemas;
+using OrderCraft.Tenancy;
 
 namespace OrderCraft.Services;
 
@@ -63,6 +64,7 @@ public class OrganizationService : IOrganizationService
         Guid userId,
         Guid organizationId,
         string password,
+        bool rememberMe = false,
         CancellationToken cancellationToken = default)
     {
         var membership = await _dbContext.OrganizationMemberships

@@ -2,7 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using OrderCraft.Auth;
+using OrderCraft.Tenancy;
 using OrderCraft.Schemas;
 using OrderCraft.Services;
 

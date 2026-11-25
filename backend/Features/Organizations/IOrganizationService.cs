@@ -16,6 +16,7 @@ public interface IOrganizationService
         Guid userId,
         Guid organizationId,
         string password,
+        bool rememberMe = false,
         CancellationToken cancellationToken = default);
 
     Task<(UserResponse? Member, string? Error)> AddExistingMemberAsync(

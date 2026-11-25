@@ -7,7 +7,7 @@ namespace OrderCraft.Models;
 public class OrderItem
 {
     [Key]
-    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid Id { get; set; }
 
     [Required]
     public Guid OrderId { get; set; }
@@ -33,5 +33,6 @@ public class OrderItem
 
     public Order Order { get; set; } = null!;
 
-    public Product Product { get; set; } = null!;
+    /// <summary>Optional so soft-deleted products do not hide order lines on load.</summary>
+    public Product? Product { get; set; }
 }

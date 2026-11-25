@@ -1,8 +1,11 @@
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Identity;
-using OrderCraft.Auth;
+using OrderCraft.Auth.Cookies;
+using OrderCraft.Auth.Jwt;
+using OrderCraft.Auth.Revocation;
 using OrderCraft.Models;
+using OrderCraft.Tenancy;
 
 namespace OrderCraft.Services;
 

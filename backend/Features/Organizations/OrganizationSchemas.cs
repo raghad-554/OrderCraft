@@ -97,6 +97,9 @@ public class InvitationResponse
 public class SwitchOrganizationRequest
 {
     public string Password { get; set; } = string.Empty;
+
+    /// <summary>Keep auth cookie/JWT persistence aligned with the login Remember me choice.</summary>
+    public bool RememberMe { get; set; }
 }
 
 public class SwitchOrganizationRequestValidator : AbstractValidator<SwitchOrganizationRequest>

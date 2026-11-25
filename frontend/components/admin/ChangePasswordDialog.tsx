@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { ApiError } from "@/lib/api";
 import { clearSession } from "@/lib/auth";
@@ -68,8 +69,8 @@ export default function ChangePasswordDialog({
 
   if (!open) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center p-3 sm:items-center">
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-end justify-center overflow-y-auto p-3 sm:items-center">
       <button
         type="button"
         aria-label="Close dialog"
@@ -178,6 +179,7 @@ export default function ChangePasswordDialog({
           </form>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

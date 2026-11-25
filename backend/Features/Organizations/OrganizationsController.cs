@@ -2,10 +2,11 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using OrderCraft.Auth;
+using OrderCraft.Auth.Cookies;
 using OrderCraft.Models;
 using OrderCraft.Schemas;
 using OrderCraft.Services;
+using OrderCraft.Tenancy;
 
 namespace OrderCraft.Controllers;
 
@@ -65,6 +66,7 @@ public class OrganizationsController : ControllerBase
             userId,
             id,
             request.Password,
+            request.RememberMe,
             cancellationToken);
         if (error == "Organization not found.")
             return NotFound(new { message = error });
@@ -73,8 +75,7 @@ public class OrganizationsController : ControllerBase
 
         if (result is not null && !string.IsNullOrWhiteSpace(result.Token))
         {
-            // Keep session persistence aligned with an existing local remember preference cookie max-age window.
-            _authCookies.SetAuthCookie(HttpContext, result.Token, remember: true);
+            _authCookies.SetAuthCookie(HttpContext, result.Token, request.RememberMe);
             result.Token = string.Empty;
         }
 

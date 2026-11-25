@@ -8,7 +8,11 @@ public class LoginRequest
     public string Username { get; set; } = string.Empty;
     public string Password { get; set; } = string.Empty;
 
-    /// <summary>When true, auth cookie persists for JWT ExpireMinutes; otherwise session cookie.</summary>
+    /// <summary>
+    /// When true, auth cookie persists across browser restart for JWT ExpireMinutes.
+    /// When false, session cookie (cleared when the browser closes).
+    /// JWT lifetime is always ExpireMinutes.
+    /// </summary>
     public bool RememberMe { get; set; }
 }
 

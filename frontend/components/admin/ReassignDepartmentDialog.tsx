@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import ScrollSelect from "@/components/ui/ScrollSelect";
 import { ApiError } from "@/lib/api";
 import {
@@ -128,8 +129,8 @@ export default function ReassignDepartmentDialog({
   const moveAllLabel =
     intent === "remove" ? "Move all and remove" : "Move all and deactivate";
 
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto p-4">
       <button
         type="button"
         aria-label="Close reassign dialog"
@@ -260,6 +261,7 @@ export default function ReassignDepartmentDialog({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

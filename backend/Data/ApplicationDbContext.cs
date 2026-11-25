@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using OrderCraft.Models;
+using OrderCraft.Tenancy;
 
 namespace OrderCraft.Services;
 
@@ -631,6 +632,7 @@ public class ApplicationDbContext : DbContext
             entity.HasOne(oi => oi.Product)
                 .WithMany(p => p.OrderItems)
                 .HasForeignKey(oi => oi.ProductId)
+                .IsRequired(false)
                 .OnDelete(DeleteBehavior.Restrict);
         });
     }
